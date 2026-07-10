@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedidos — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .loja-bloco {
+      margin-bottom: 20px;
+    }
+
+    .loja-bloco:last-child {
+      margin-bottom: 0;
+    }
+
+    .fornecedor-bloco {
+      margin-bottom: 20px;
+    }
+
+    .fornecedor-bloco:last-child {
+      margin-bottom: 0;
+    }
+
+    .preco-indicador {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .preco-indicador.is-caro {
+      color: var(--danger);
+    }
+
+    .preco-indicador.is-medio {
+      color: var(--warning);
+    }
+
+    .preco-indicador.is-bom {
+      color: var(--success);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 class="page-title">Pedidos</h1>
+          <p class="page-subtitle">Lista de compras e reposição de estoque</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mb-16">
+        <span class="section-title">Por loja</span>
+      </div>
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-body" id="pedidos-por-loja"></div>
+      </div>
+
+      <div class="flex items-center justify-between mb-16">
+        <span class="section-title">Por fornecedor</span>
+      </div>
+      <div id="pedidos-por-fornecedor"></div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    function linhaItemLoja(item, lojaId) {
+      const atual = item.qty[lojaId] ?? 0;
+      const min = item.min[lojaId] ?? 0;
+      const aPedir = Math.max(min - atual, 0);
+      return `
+        <tr>
+          <td>${item.nome}</td>
+          <td class="td-num">${fmt(atual)} ${item.un}</td>
+          <td class="td-num">${fmt(min)} ${item.un}</td>
+          <td class="td-num" style="font-weight:600">${fmt(aPedir)} ${item.un}</td>
+        </tr>
+      `;
+    }
+
+    function renderPorLoja() {
+      const container = document.getElementById('pedidos-por-loja');
+      const lojas = lojasPermitidas();
+
+      container.innerHTML = lojas.map((loja, idx) => {
+        const itens = getItensAbaixoMinimo(loja.id);
+        const separador = idx > 0 ? 'style="border-top:1px solid var(--border-subtle); padding-top:20px;"' : '';
+
+        if (itens.length === 0) {
+          return `
+            <div class="loja-bloco" ${separador}>
+              <div class="flex items-center justify-between mb-16">
+                <span style="font-weight:600">${loja.label}</span>
+                <span class="badge badge-ok">Tudo em dia</span>
+              </div>
+              <div class="empty-state">
+                <span class="empty-state-icon">${ICONS.check}</span>
+                <div class="empty-state-title">Nenhum item abaixo do mínimo</div>
+                <div class="empty-state-subtitle">Esta loja não precisa de reposição no momento.</div>
+              </div>
+            </div>
+          `;
+        }
+
+        const linhas = itens.map((item) => linhaItemLoja(item, loja.id)).join('');
+
+        return `
+          <div class="loja-bloco" ${separador}>
+            <div class="flex items-center justify-between mb-16">
+              <span style="font-weight:600">${loja.label}</span>
+              <span class="badge badge-low">${itens.length} ${itens.length === 1 ? 'item' : 'itens'} a repor</span>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th class="td-num">Estoque atual</th>
+                    <th class="td-num">Mínimo</th>
+                    <th class="td-num">Qtd. a pedir</th>
+                  </tr>
+                </thead>
+                <tbody>${linhas}</tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function iconIndicadorPreco(status) {
+      if (status === 'caro') return ICONS['arrow-up'];
+      if (status === 'bom') return ICONS['arrow-down'];
+      return ICONS['arrow-right'];
+    }
+
+    function labelIndicadorPreco(status) {
+      if (status === 'caro') return 'Pagando caro';
+      if (status === 'bom') return 'Preço bom';
+      return 'Preço médio';
+    }
+
+    function getTotaisAPedirPorItem() {
+      const lojas = lojasPermitidas();
+      const totais = {};
+
+      lojas.forEach((loja) => {
+        getItensAbaixoMinimo(loja.id).forEach((item) => {
+          const atual = item.qty[loja.id] ?? 0;
+          const min = item.min[loja.id] ?? 0;
+          const aPedir = Math.max(min - atual, 0);
+          if (aPedir <= 0) return;
+          totais[item.id] = (totais[item.id] || 0) + aPedir;
+        });
+      });
+
+      return totais;
+    }
+
+    function renderPorFornecedor() {
+      const container = document.getElementById('pedidos-por-fornecedor');
+      const data = getData();
+      const totais = getTotaisAPedirPorItem();
+
+      const porFornecedor = {};
+      Object.keys(totais).forEach((itemId) => {
+        const item = data.itens.find((i) => i.id === itemId);
+        if (!item || !item.fornecedorId) return;
+        if (!porFornecedor[item.fornecedorId]) porFornecedor[item.fornecedorId] = [];
+        porFornecedor[item.fornecedorId].push({ item, qtd: totais[itemId] });
+      });
+
+      const blocos = FORNECEDORES
+        .filter((f) => porFornecedor[f.id] && porFornecedor[f.id].length > 0)
+        .map((forn) => {
+          let valorTotal = 0;
+
+          const linhas = porFornecedor[forn.id].map(({ item, qtd }) => {
+            const ultimo = getUltimoPrecoPago(item.id);
+            const indicador = getIndicadorPreco(item.id);
+            const precoUltimo = ultimo ? ultimo.precoPago : item.precoUnit;
+            valorTotal += qtd * precoUltimo;
+
+            return `
+              <tr>
+                <td>${item.nome}</td>
+                <td class="td-num">${fmt(qtd)} ${item.un}</td>
+                <td class="td-num">${fmtR(precoUltimo)}</td>
+                <td>
+                  <span class="preco-indicador is-${indicador.status}">
+                    ${iconIndicadorPreco(indicador.status)} ${labelIndicadorPreco(indicador.status)}
+                  </span>
+                </td>
+              </tr>
+            `;
+          }).join('');
+
+          const badgeTipo = forn.tipo === 'atacado'
+            ? '<span class="badge badge-info">Compra no atacado</span>'
+            : '<span class="badge badge-neutral">Pedido direto</span>';
+
+          return `
+            <div class="card fornecedor-bloco">
+              <div class="card-header">
+                <div class="flex items-center gap-8">
+                  <span class="card-title">${forn.nome}</span>
+                  ${badgeTipo}
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th class="td-num">Qtd. a pedir</th>
+                      <th class="td-num">Último preço pago</th>
+                      <th>Tendência</th>
+                    </tr>
+                  </thead>
+                  <tbody>${linhas}</tbody>
+                </table>
+              </div>
+              <div class="card-footer">
+                <span style="font-weight:600">Total estimado do pedido: ${fmtR(valorTotal)}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      if (!blocos) {
+        container.innerHTML = `
+          <div class="card">
+            <div class="card-body">
+              <div class="empty-state">
+                <span class="empty-state-icon">${ICONS.check}</span>
+                <div class="empty-state-title">Nenhum pedido necessário</div>
+                <div class="empty-state-subtitle">Todos os itens estão dentro do estoque mínimo.</div>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = blocos;
+    }
+
+    initTopbar('pedidos');
+    renderPorLoja();
+    renderPorFornecedor();
+  </script>
+</body>
+</html>

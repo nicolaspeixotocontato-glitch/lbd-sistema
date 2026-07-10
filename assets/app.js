@@ -33,6 +33,17 @@ const CATEGORIAS = [
   'Padaria e Pães',
 ];
 
+const FORNECEDORES = [
+  { id: 'f1', nome: 'Laticínios Vale Verde', tipo: 'fornecedor' },
+  { id: 'f2', nome: 'Frios & Cia Distribuidora', tipo: 'fornecedor' },
+  { id: 'f3', nome: 'Hortifruti Bom Preço', tipo: 'fornecedor' },
+  { id: 'f4', nome: 'Distribuidora Bebidas Sul', tipo: 'fornecedor' },
+  { id: 'f5', nome: 'Assaí Atacadista', tipo: 'atacado' },
+  { id: 'f6', nome: 'Makro Atacado', tipo: 'atacado' },
+  { id: 'f7', nome: 'Doce Sabor Insumos', tipo: 'fornecedor' },
+  { id: 'f8', nome: 'Padaria Trigo Dourado', tipo: 'fornecedor' },
+];
+
 const MOTIVOS_SAIDA = [
   'Consumo em produção',
   'Perda / Vencimento',
@@ -57,36 +68,36 @@ const USUARIOS = [
 
 const DADOS_INICIAIS = {
   itens: [
-    { id: 'i01', nome: 'Queijo Mussarela', cat: 'Queijos', un: 'kg', precoUnit: 32.9, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 34, LBD02: 8, LBD03: 0 }, ativo: true },
-    { id: 'i02', nome: 'Queijo Parmesão', cat: 'Queijos', un: 'kg', precoUnit: 45.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 9, LBD02: 2, LBD03: 5 }, ativo: true },
-    { id: 'i03', nome: 'Queijo Provolone', cat: 'Queijos', un: 'kg', precoUnit: 38.5, min: { LBD01: 8, LBD02: 6, LBD03: 4 }, qty: { LBD01: 12, LBD02: 6, LBD03: 3 }, ativo: true },
-    { id: 'i04', nome: 'Catupiry Original', cat: 'Queijos', un: 'kg', precoUnit: 42.0, min: { LBD01: 10, LBD02: 8, LBD03: 5 }, qty: { LBD01: 15, LBD02: 3, LBD03: 6 }, ativo: true },
-    { id: 'i05', nome: 'Calabresa Fatiada', cat: 'Frios e Embutidos', un: 'kg', precoUnit: 24.9, min: { LBD01: 15, LBD02: 10, LBD03: 8 }, qty: { LBD01: 22, LBD02: 4, LBD03: 8 }, ativo: true },
-    { id: 'i06', nome: 'Presunto Fatiado', cat: 'Frios e Embutidos', un: 'kg', precoUnit: 22.5, min: { LBD01: 8, LBD02: 6, LBD03: 5 }, qty: { LBD01: 10, LBD02: 6, LBD03: 0 }, ativo: true },
-    { id: 'i07', nome: 'Bacon em Cubos', cat: 'Frios e Embutidos', un: 'kg', precoUnit: 28.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 7, LBD02: 5, LBD03: 4 }, ativo: true },
-    { id: 'i08', nome: 'Molho de Tomate', cat: 'Molhos e Conservas', un: 'L', precoUnit: 8.5, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 30, LBD02: 12, LBD03: 10 }, ativo: true },
-    { id: 'i09', nome: 'Azeitona Preta Fatiada', cat: 'Molhos e Conservas', un: 'kg', precoUnit: 18.0, min: { LBD01: 5, LBD02: 4, LBD03: 3 }, qty: { LBD01: 6, LBD02: 1, LBD03: 3 }, ativo: true },
-    { id: 'i10', nome: 'Palmito em Conserva', cat: 'Molhos e Conservas', un: 'kg', precoUnit: 26.0, min: { LBD01: 4, LBD02: 3, LBD03: 2 }, qty: { LBD01: 5, LBD02: 3, LBD03: 0 }, ativo: true },
-    { id: 'i11', nome: 'Farinha de Trigo', cat: 'Farinhas e Massas', un: 'kg', precoUnit: 5.2, min: { LBD01: 40, LBD02: 30, LBD03: 20 }, qty: { LBD01: 55, LBD02: 12, LBD03: 20 }, ativo: true },
-    { id: 'i12', nome: 'Fermento Biológico', cat: 'Farinhas e Massas', un: 'kg', precoUnit: 32.0, min: { LBD01: 3, LBD02: 2, LBD03: 2 }, qty: { LBD01: 4, LBD02: 2, LBD03: 1 }, ativo: true },
-    { id: 'i13', nome: 'Massa de Pizza Pronta', cat: 'Farinhas e Massas', un: 'un', precoUnit: 3.5, min: { LBD01: 100, LBD02: 80, LBD03: 50 }, qty: { LBD01: 120, LBD02: 40, LBD03: 50 }, ativo: true },
-    { id: 'i14', nome: 'Cebola', cat: 'Hortifruti', un: 'kg', precoUnit: 4.5, min: { LBD01: 10, LBD02: 8, LBD03: 6 }, qty: { LBD01: 14, LBD02: 8, LBD03: 2 }, ativo: true },
-    { id: 'i15', nome: 'Tomate', cat: 'Hortifruti', un: 'kg', precoUnit: 6.8, min: { LBD01: 10, LBD02: 8, LBD03: 6 }, qty: { LBD01: 12, LBD02: 3, LBD03: 6 }, ativo: true },
-    { id: 'i16', nome: 'Manjericão Fresco', cat: 'Hortifruti', un: 'pct', precoUnit: 3.0, min: { LBD01: 8, LBD02: 6, LBD03: 4 }, qty: { LBD01: 10, LBD02: 6, LBD03: 0 }, ativo: true },
-    { id: 'i17', nome: 'Orégano', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 55.0, min: { LBD01: 2, LBD02: 1.5, LBD03: 1 }, qty: { LBD01: 3, LBD02: 0.5, LBD03: 1 }, ativo: true },
-    { id: 'i18', nome: 'Sal Refinado', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 3.2, min: { LBD01: 5, LBD02: 4, LBD03: 3 }, qty: { LBD01: 8, LBD02: 4, LBD03: 3 }, ativo: true },
-    { id: 'i19', nome: 'Pimenta Calabresa', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 40.0, min: { LBD01: 2, LBD02: 1.5, LBD03: 1 }, qty: { LBD01: 2.5, LBD02: 0, LBD03: 1 }, ativo: true },
-    { id: 'i20', nome: 'Azeite de Oliva Extra Virgem', cat: 'Óleos e Gorduras', un: 'L', precoUnit: 32.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 9, LBD02: 2, LBD03: 4 }, ativo: true },
-    { id: 'i21', nome: 'Óleo de Soja', cat: 'Óleos e Gorduras', un: 'L', precoUnit: 8.0, min: { LBD01: 10, LBD02: 8, LBD03: 6 }, qty: { LBD01: 12, LBD02: 8, LBD03: 1 }, ativo: true },
-    { id: 'i22', nome: 'Coca-Cola Lata 350ml', cat: 'Bebidas', un: 'un', precoUnit: 4.5, min: { LBD01: 100, LBD02: 80, LBD03: 50 }, qty: { LBD01: 140, LBD02: 30, LBD03: 50 }, ativo: true },
-    { id: 'i23', nome: 'Guaraná Antarctica Lata', cat: 'Bebidas', un: 'un', precoUnit: 4.2, min: { LBD01: 80, LBD02: 60, LBD03: 40 }, qty: { LBD01: 90, LBD02: 20, LBD03: 0 }, ativo: true },
-    { id: 'i24', nome: 'Cerveja Long Neck', cat: 'Bebidas', un: 'un', precoUnit: 7.5, min: { LBD01: 60, LBD02: 40, LBD03: 30 }, qty: { LBD01: 70, LBD02: 40, LBD03: 12 }, ativo: true },
-    { id: 'i25', nome: 'Suco de Laranja 1L', cat: 'Bebidas', un: 'un', precoUnit: 9.0, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 25, LBD02: 5, LBD03: 10 }, ativo: true },
-    { id: 'i26', nome: 'Chocolate ao Leite (Cobertura)', cat: 'Sobremesas e Doces', un: 'kg', precoUnit: 34.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 8, LBD02: 1, LBD03: 4 }, ativo: true },
-    { id: 'i27', nome: 'Leite Condensado', cat: 'Sobremesas e Doces', un: 'un', precoUnit: 6.5, min: { LBD01: 15, LBD02: 12, LBD03: 8 }, qty: { LBD01: 18, LBD02: 12, LBD03: 0 }, ativo: true },
-    { id: 'i28', nome: 'Morango Congelado', cat: 'Sobremesas e Doces', un: 'kg', precoUnit: 22.0, min: { LBD01: 4, LBD02: 3, LBD03: 2 }, qty: { LBD01: 5, LBD02: 0, LBD03: 2 }, ativo: true },
-    { id: 'i29', nome: 'Caixa de Pizza Grande', cat: 'Embalagens', un: 'un', precoUnit: 1.8, min: { LBD01: 200, LBD02: 150, LBD03: 100 }, qty: { LBD01: 260, LBD02: 60, LBD03: 100 }, ativo: true },
-    { id: 'i30', nome: 'Guardanapo de Papel', cat: 'Descartáveis', un: 'pct', precoUnit: 5.0, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 24, LBD02: 15, LBD03: 3 }, ativo: true },
+    { id: 'i01', nome: 'Queijo Mussarela', cat: 'Queijos', un: 'kg', precoUnit: 32.9, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 34, LBD02: 8, LBD03: 0 }, ativo: true, fornecedorId: 'f1' },
+    { id: 'i02', nome: 'Queijo Parmesão', cat: 'Queijos', un: 'kg', precoUnit: 45.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 9, LBD02: 2, LBD03: 5 }, ativo: true, fornecedorId: 'f1' },
+    { id: 'i03', nome: 'Queijo Provolone', cat: 'Queijos', un: 'kg', precoUnit: 38.5, min: { LBD01: 8, LBD02: 6, LBD03: 4 }, qty: { LBD01: 12, LBD02: 6, LBD03: 3 }, ativo: true, fornecedorId: 'f1' },
+    { id: 'i04', nome: 'Catupiry Original', cat: 'Queijos', un: 'kg', precoUnit: 42.0, min: { LBD01: 10, LBD02: 8, LBD03: 5 }, qty: { LBD01: 15, LBD02: 3, LBD03: 6 }, ativo: true, fornecedorId: 'f1' },
+    { id: 'i05', nome: 'Calabresa Fatiada', cat: 'Frios e Embutidos', un: 'kg', precoUnit: 24.9, min: { LBD01: 15, LBD02: 10, LBD03: 8 }, qty: { LBD01: 22, LBD02: 4, LBD03: 8 }, ativo: true, fornecedorId: 'f2' },
+    { id: 'i06', nome: 'Presunto Fatiado', cat: 'Frios e Embutidos', un: 'kg', precoUnit: 22.5, min: { LBD01: 8, LBD02: 6, LBD03: 5 }, qty: { LBD01: 10, LBD02: 6, LBD03: 0 }, ativo: true, fornecedorId: 'f2' },
+    { id: 'i07', nome: 'Bacon em Cubos', cat: 'Frios e Embutidos', un: 'kg', precoUnit: 28.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 7, LBD02: 5, LBD03: 4 }, ativo: true, fornecedorId: 'f2' },
+    { id: 'i08', nome: 'Molho de Tomate', cat: 'Molhos e Conservas', un: 'L', precoUnit: 8.5, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 30, LBD02: 12, LBD03: 10 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i09', nome: 'Azeitona Preta Fatiada', cat: 'Molhos e Conservas', un: 'kg', precoUnit: 18.0, min: { LBD01: 5, LBD02: 4, LBD03: 3 }, qty: { LBD01: 6, LBD02: 1, LBD03: 3 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i10', nome: 'Palmito em Conserva', cat: 'Molhos e Conservas', un: 'kg', precoUnit: 26.0, min: { LBD01: 4, LBD02: 3, LBD03: 2 }, qty: { LBD01: 5, LBD02: 3, LBD03: 0 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i11', nome: 'Farinha de Trigo', cat: 'Farinhas e Massas', un: 'kg', precoUnit: 5.2, min: { LBD01: 40, LBD02: 30, LBD03: 20 }, qty: { LBD01: 55, LBD02: 12, LBD03: 20 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i12', nome: 'Fermento Biológico', cat: 'Farinhas e Massas', un: 'kg', precoUnit: 32.0, min: { LBD01: 3, LBD02: 2, LBD03: 2 }, qty: { LBD01: 4, LBD02: 2, LBD03: 1 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i13', nome: 'Massa de Pizza Pronta', cat: 'Farinhas e Massas', un: 'un', precoUnit: 3.5, min: { LBD01: 100, LBD02: 80, LBD03: 50 }, qty: { LBD01: 120, LBD02: 40, LBD03: 50 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i14', nome: 'Cebola', cat: 'Hortifruti', un: 'kg', precoUnit: 4.5, min: { LBD01: 10, LBD02: 8, LBD03: 6 }, qty: { LBD01: 14, LBD02: 8, LBD03: 2 }, ativo: true, fornecedorId: 'f3' },
+    { id: 'i15', nome: 'Tomate', cat: 'Hortifruti', un: 'kg', precoUnit: 6.8, min: { LBD01: 10, LBD02: 8, LBD03: 6 }, qty: { LBD01: 12, LBD02: 3, LBD03: 6 }, ativo: true, fornecedorId: 'f3' },
+    { id: 'i16', nome: 'Manjericão Fresco', cat: 'Hortifruti', un: 'pct', precoUnit: 3.0, min: { LBD01: 8, LBD02: 6, LBD03: 4 }, qty: { LBD01: 10, LBD02: 6, LBD03: 0 }, ativo: true, fornecedorId: 'f3' },
+    { id: 'i17', nome: 'Orégano', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 55.0, min: { LBD01: 2, LBD02: 1.5, LBD03: 1 }, qty: { LBD01: 3, LBD02: 0.5, LBD03: 1 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i18', nome: 'Sal Refinado', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 3.2, min: { LBD01: 5, LBD02: 4, LBD03: 3 }, qty: { LBD01: 8, LBD02: 4, LBD03: 3 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i19', nome: 'Pimenta Calabresa', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 40.0, min: { LBD01: 2, LBD02: 1.5, LBD03: 1 }, qty: { LBD01: 2.5, LBD02: 0, LBD03: 1 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i20', nome: 'Azeite de Oliva Extra Virgem', cat: 'Óleos e Gorduras', un: 'L', precoUnit: 32.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 9, LBD02: 2, LBD03: 4 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i21', nome: 'Óleo de Soja', cat: 'Óleos e Gorduras', un: 'L', precoUnit: 8.0, min: { LBD01: 10, LBD02: 8, LBD03: 6 }, qty: { LBD01: 12, LBD02: 8, LBD03: 1 }, ativo: true, fornecedorId: 'f6' },
+    { id: 'i22', nome: 'Coca-Cola Lata 350ml', cat: 'Bebidas', un: 'un', precoUnit: 4.5, min: { LBD01: 100, LBD02: 80, LBD03: 50 }, qty: { LBD01: 140, LBD02: 30, LBD03: 50 }, ativo: true, fornecedorId: 'f4' },
+    { id: 'i23', nome: 'Guaraná Antarctica Lata', cat: 'Bebidas', un: 'un', precoUnit: 4.2, min: { LBD01: 80, LBD02: 60, LBD03: 40 }, qty: { LBD01: 90, LBD02: 20, LBD03: 0 }, ativo: true, fornecedorId: 'f4' },
+    { id: 'i24', nome: 'Cerveja Long Neck', cat: 'Bebidas', un: 'un', precoUnit: 7.5, min: { LBD01: 60, LBD02: 40, LBD03: 30 }, qty: { LBD01: 70, LBD02: 40, LBD03: 12 }, ativo: true, fornecedorId: 'f4' },
+    { id: 'i25', nome: 'Suco de Laranja 1L', cat: 'Bebidas', un: 'un', precoUnit: 9.0, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 25, LBD02: 5, LBD03: 10 }, ativo: true, fornecedorId: 'f4' },
+    { id: 'i26', nome: 'Chocolate ao Leite (Cobertura)', cat: 'Sobremesas e Doces', un: 'kg', precoUnit: 34.0, min: { LBD01: 6, LBD02: 5, LBD03: 4 }, qty: { LBD01: 8, LBD02: 1, LBD03: 4 }, ativo: true, fornecedorId: 'f7' },
+    { id: 'i27', nome: 'Leite Condensado', cat: 'Sobremesas e Doces', un: 'un', precoUnit: 6.5, min: { LBD01: 15, LBD02: 12, LBD03: 8 }, qty: { LBD01: 18, LBD02: 12, LBD03: 0 }, ativo: true, fornecedorId: 'f7' },
+    { id: 'i28', nome: 'Morango Congelado', cat: 'Sobremesas e Doces', un: 'kg', precoUnit: 22.0, min: { LBD01: 4, LBD02: 3, LBD03: 2 }, qty: { LBD01: 5, LBD02: 0, LBD03: 2 }, ativo: true, fornecedorId: 'f7' },
+    { id: 'i29', nome: 'Caixa de Pizza Grande', cat: 'Embalagens', un: 'un', precoUnit: 1.8, min: { LBD01: 200, LBD02: 150, LBD03: 100 }, qty: { LBD01: 260, LBD02: 60, LBD03: 100 }, ativo: true, fornecedorId: 'f5' },
+    { id: 'i30', nome: 'Guardanapo de Papel', cat: 'Descartáveis', un: 'pct', precoUnit: 5.0, min: { LBD01: 20, LBD02: 15, LBD03: 10 }, qty: { LBD01: 24, LBD02: 15, LBD03: 3 }, ativo: true, fornecedorId: 'f5' },
   ],
   historico: [
     { id: 'h1', ts: Date.now() - 1000 * 60 * 60 * 26, tipo: 'entrada', lojaId: 'LBD01', itemId: 'i01', qty: 20, motivo: null, userId: 'u2', userNome: 'Carlos' },
@@ -97,6 +108,53 @@ const DADOS_INICIAIS = {
     { id: 'h6', ts: Date.now() - 1000 * 60 * 30, tipo: 'saida', lojaId: 'LBD01', itemId: 'i22', qty: 24, motivo: 'Consumo em produção', userId: 'u4', userNome: 'Pedro' },
   ],
 };
+
+/* ==========================================================================
+   2b. Histórico de preços pagos (mock)
+   ========================================================================== */
+
+function _seedFromId(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) % 997;
+  }
+  return h;
+}
+
+function gerarHistoricoPrecos(itens) {
+  const hoje = Date.now();
+  const DIA = 1000 * 60 * 60 * 24;
+  const arredonda = (v) => Math.round(v * 100) / 100;
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+  const resultado = {};
+
+  itens.forEach((item) => {
+    const seed = _seedFromId(item.id);
+    const preco = item.precoUnit;
+
+    const offset1 = clamp((((seed % 11) - 5) / 5) * 0.15, -0.15, 0.15);
+    const offset2 = clamp(((((seed >> 2) % 9) - 4) / 4) * 0.15, -0.15, 0.15);
+    const mediaAnteriores = (offset1 + offset2) / 2;
+
+    const padrao = seed % 3;
+    let offset3;
+    if (padrao === 0) offset3 = mediaAnteriores + 0.09; // mais recente mais caro
+    else if (padrao === 1) offset3 = mediaAnteriores - 0.09; // mais recente mais barato
+    else offset3 = mediaAnteriores + (seed % 2 === 0 ? 0.01 : -0.01); // mais recente ~igual
+    offset3 = clamp(offset3, -0.15, 0.15);
+
+    resultado[item.id] = [
+      { data: hoje - DIA * 60, precoPago: arredonda(preco * (1 + offset1)) },
+      { data: hoje - DIA * 30, precoPago: arredonda(preco * (1 + offset2)) },
+      { data: hoje - DIA * 7, precoPago: arredonda(preco * (1 + offset3)) },
+    ];
+  });
+
+  return resultado;
+}
+
+const HISTORICO_PRECOS = gerarHistoricoPrecos(DADOS_INICIAIS.itens);
 
 /* ==========================================================================
    3. Storage
@@ -174,7 +232,7 @@ function logout() {
    ========================================================================== */
 
 const PERMISSOES_POR_PERFIL = {
-  gerente: ['ver_painel', 'ver_estoque', 'ver_entradas', 'ver_saidas', 'ver_transferencias', 'ver_historico'],
+  gerente: ['ver_painel', 'ver_estoque', 'ver_entradas', 'ver_saidas', 'ver_transferencias', 'ver_historico', 'ver_pedidos'],
   operador: ['ver_saidas'],
 };
 
@@ -185,6 +243,7 @@ const PAGINA_PERMISSAO = {
   saidas: 'ver_saidas',
   transferencias: 'ver_transferencias',
   historico: 'ver_historico',
+  pedidos: 'ver_pedidos',
   etiquetas: 'editar_estoque',
 };
 
@@ -345,6 +404,31 @@ function excluirItem(itemId) {
   return { ok: true, item };
 }
 
+function getHistoricoPrecos(itemId) {
+  return HISTORICO_PRECOS[itemId] || [];
+}
+
+function getUltimoPrecoPago(itemId) {
+  const hist = getHistoricoPrecos(itemId);
+  return hist.length ? hist[hist.length - 1] : null;
+}
+
+function getIndicadorPreco(itemId) {
+  const hist = getHistoricoPrecos(itemId);
+  if (hist.length < 2) return { status: 'medio', variacaoPct: 0 };
+
+  const recente = hist[hist.length - 1];
+  const anteriores = hist.slice(0, -1);
+  const media = anteriores.reduce((acc, r) => acc + r.precoPago, 0) / anteriores.length;
+  const variacaoPct = media > 0 ? ((recente.precoPago - media) / media) * 100 : 0;
+
+  let status = 'medio';
+  if (variacaoPct > 5) status = 'caro';
+  else if (variacaoPct < -5) status = 'bom';
+
+  return { status, variacaoPct, media };
+}
+
 /* ==========================================================================
    6. Formatação
    ========================================================================== */
@@ -446,6 +530,7 @@ const NAV_ITEMS = [
   { id: 'saidas', label: 'Saídas', href: 'saidas.html', icon: 'saidas', acao: 'ver_saidas' },
   { id: 'transferencias', label: 'Transferências', href: 'transferencias.html', icon: 'transfer', acao: 'ver_transferencias' },
   { id: 'historico', label: 'Histórico', href: 'historico.html', icon: 'historico', acao: 'ver_historico' },
+  { id: 'pedidos', label: 'Pedidos', href: 'pedidos.html', icon: 'pedidos', acao: 'ver_pedidos' },
   { id: 'etiquetas', label: 'Etiquetas', href: 'etiquetas.html', icon: 'etiquetas', acao: 'editar_estoque' },
 ];
 
@@ -686,7 +771,9 @@ const ICONS = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M20 6 9 17l-5-5"/></svg>',
   'arrow-up': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>',
   'arrow-down': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>',
+  'arrow-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/></svg>',
+  pedidos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>',
   etiquetas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3"/><path d="M14 21h.01"/><path d="M21 14v.01"/><path d="M21 21h-3"/></svg>',
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>',
 };
