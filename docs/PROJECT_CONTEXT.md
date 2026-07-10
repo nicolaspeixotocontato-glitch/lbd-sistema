@@ -135,7 +135,7 @@ estrutura "flat" típica de projeto estático simples.
 
 ## 5. Módulos existentes
 
-### 5.1 `assets/app.js` (núcleo — 875 linhas), organizado em seções comentadas:
+### 5.1 `assets/app.js` (núcleo — 884 linhas), organizado em seções comentadas:
 
 | # | Seção | Conteúdo |
 |---|---|---|
@@ -145,7 +145,7 @@ estrutura "flat" típica de projeto estático simples.
 | 3 | Storage | `getData`/`saveData` (com migração), `getSession`/`saveSession`/`clearSession` |
 | 4 | Auth | `login`, `requireAuth`, `getUsuarioAtivo`, `logout` |
 | 4b | Permissões | `PERMISSOES_POR_PERFIL`, `PAGINA_PERMISSAO`, `checkPermissao`, `lojasPermitidas`, `verificarAcessoPagina`, `getFiltroLojaPadrao` |
-| 5 | Estoque | `getStatusEstoque`, `getItensAbaixoMinimo`, `getItensZerados`, `registrarMovimentacao`, `registrarTransferencia`, `adicionarItem`, `editarItem`, `excluirItem`, `getHistoricoPrecos`, `getUltimoPrecoPago`, `getIndicadorPreco` |
+| 5 | Estoque | `getStatusEstoque`, `CRITICIDADE_ORDEM`, `getCriticidade`, `getItensAbaixoMinimo`, `getItensZerados`, `registrarMovimentacao`, `registrarTransferencia`, `adicionarItem`, `editarItem`, `excluirItem`, `getHistoricoPrecos`, `getUltimoPrecoPago`, `getIndicadorPreco` |
 | 6 | Formatação | `fmt`, `fmtR`, `fmtDate`, `fmtDateFull` |
 | 7 | UI Helpers | `toast`, `destacarCampoPendente`, `initClearButton`, `initAutocompleteTeclado`, `openModal`/`closeModal`, `initSidebarMobile`, `NAV_ITEMS`, `buildSidebar`, `buildTopbar`, `initTopbar`, `getLojaAtiva`/`setLojaAtiva`, `abrirSeletorLoja` |
 | 7b | Scanner de QR Code | `iniciarCameraScanner`, `abrirScannerQR`, `fecharScannerQR` (usa `jsQR.js`) |
@@ -167,7 +167,7 @@ estrutura "flat" típica de projeto estático simples.
 | Saídas | `saidas.html` | Busca/autocomplete + scanner QR, registro de saída com motivo |
 | Transferências | `transferencias.html` | Transferência de item entre duas lojas, com preview de estoque origem/destino |
 | Histórico | `historico.html` | Listagem paginada e filtrável de todas as movimentações, exportar CSV |
-| Pedidos | `pedidos.html` | Lista de compras "por loja" e "por fornecedor", com indicador de tendência de preço |
+| Pedidos | `pedidos.html` | Central de compras: resumo executivo, criticidade por item, ordenação por urgência, filtros (loja/fornecedor/categoria), seleção múltipla com resumo dinâmico, observação + copiar para WhatsApp, exportar CSV |
 | Etiquetas | `etiquetas.html` | Seleção de itens + geração/impressão de etiquetas com QR Code |
 
 ### 5.3 Design system (`assets/style.css`)
@@ -345,12 +345,40 @@ Consequências importantes (por não estarem na lista de nenhum perfil, exceto a
 - Toda movimentação de estoque grava uma linha em `historico` com `userId`/`userNome` de
   quem executou.
 
-### 8.4 Pedidos (lista de compras)
+### 8.4 Pedidos — Central de Compras
 
 - "Item abaixo do mínimo" = `status` `low` ou `out` (`getItensAbaixoMinimo`).
 - Quantidade a pedir = `max(min - atual, 0)` — nunca negativa.
-- Seção "Por fornecedor" soma a quantidade a pedir do mesmo item **entre todas as lojas
-  visíveis ao usuário** (`lojasPermitidas()`), agrupando por `fornecedorId`.
+- **Criticidade** (`getCriticidade(pct, status)`, em `app.js`): classifica cada item em 4
+  níveis a partir do `pct` (`qty/min`) já calculado por `getStatusEstoque`:
+  - `Crítico` — zerado (`status: 'out'`).
+  - `Alto` — abaixo do mínimo com `pct < 50%`.
+  - `Médio` — `pct` entre 50% e 80%.
+  - `Baixo` — `pct` entre 80% e 100% (exclusive, já que por definição está abaixo do mínimo).
+  - Usada para ordenar itens (mais crítico primeiro) e fornecedores (fornecedor com item
+    mais crítico primeiro, valor total como desempate) em ambas as seções da tela.
+- **Itens sem fornecedor cadastrado** (`fornecedorId` ausente) aparecem num bloco à parte,
+  "Sem fornecedor definido", em vez de serem omitidos da seção "Por fornecedor" (correção
+  de um bug identificado na revisão da Sprint 2 — antes, esses itens desapareciam
+  silenciosamente dessa visão).
+- Seção "Por fornecedor" soma a quantidade a pedir do mesmo item **entre todas as lojas no
+  escopo do filtro de loja ativo** (por padrão, todas as `lojasPermitidas()` do usuário).
+- **Filtros** (loja, fornecedor, categoria) atuam sobre o que é *exibido/exportado/copiado*;
+  os resumos (executivo e de seleção) sempre refletem o total real de todos os itens
+  pendentes nas lojas permitidas ao usuário, **independente dos filtros ativos**.
+- **Seleção de itens**: todos os itens pendentes vêm selecionados por padrão ao abrir a
+  tela (estado em memória, um `Set` de ids — nunca gravado no `localStorage`). Os botões
+  "Selecionar todos" / "Selecionar apenas críticos" / "Limpar seleção" operam sobre o
+  conjunto **atualmente filtrado** (não sobre todos os itens do sistema).
+- **Observação do pedido**: campo de texto livre, também em memória (não persistido),
+  incluído automaticamente no final da mensagem gerada para o WhatsApp.
+- **Copiar para WhatsApp**: por fornecedor, monta uma mensagem de texto só com os itens
+  selecionados daquele fornecedor + a observação, copia para a área de transferência
+  (`navigator.clipboard.writeText`, com aviso caso falhe) e abre `https://wa.me/?text=...`
+  para o usuário escolher o contato/grupo — não requer telefone cadastrado do fornecedor.
+- **Exportar CSV**: exporta os itens selecionados dos blocos de fornecedor atualmente
+  filtrados/exibidos; segue o mesmo padrão de Estoque/Histórico e a mesma permissão
+  `exportar_dados`.
 - Indicador de tendência de preço compara o preço pago mais recente
   (`HISTORICO_PRECOS[item].slice(-1)`) com a média dos registros anteriores:
   - `> +5%` → "Pagando caro" (vermelho, seta para cima).
@@ -393,6 +421,16 @@ Consequências importantes (por não estarem na lista de nenhum perfil, exceto a
   tendência de preço
 - [x] Migração automática de dados legados no `getData()` (fornecedores/`fornecedorId`
   para usuários que já tinham dados salvos antes da feature Pedidos)
+- [x] **Sprint 2 — Central de Compras** (2026-07-10): transforma Pedidos numa central de
+  compras completa — resumo executivo (itens a repor/críticos/fornecedores/valor total),
+  criticidade por item em 4 níveis (Crítico/Alto/Médio/Baixo, `getCriticidade`), itens e
+  fornecedores ordenados por urgência, bloco "Sem fornecedor definido" (corrige um bug em
+  que esses itens desapareciam da visão por fornecedor), filtros por loja/fornecedor/
+  categoria, seleção múltipla de itens com resumo dinâmico ao vivo (itens selecionados,
+  quantidade por unidade, valor estimado, fornecedores envolvidos), ações rápidas
+  (selecionar todos/apenas críticos/limpar seleção, com escopo no filtro ativo), campo de
+  observação (em memória, não persistido) incluído na mensagem, botão "Copiar para
+  WhatsApp" por fornecedor (clipboard + `wa.me`) e exportação CSV dos itens selecionados.
 - [x] **Sprint de UX/produtividade** (2026-07-10): foco automático após registrar
   movimentação, botão "Limpar filtros" (Estoque/Histórico), botão de limpar busca em
   todos os campos de pesquisa, navegação completa por teclado no autocomplete de item

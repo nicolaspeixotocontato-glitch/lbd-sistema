@@ -30,6 +30,8 @@
   --warning-dim: rgba(212, 160, 23, 0.12);
   --danger: #C0392B;
   --danger-dim: rgba(192, 57, 43, 0.12);
+  --orange: #D1793C;
+  --orange-dim: rgba(209, 121, 60, 0.12);
 
   /* Text */
   --text-primary: #F2F2F2;
@@ -579,6 +581,20 @@ table {
   border-color: rgba(212, 160, 23, 0.25);
 }
 
+.stat-card--danger .stat-card-icon {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.stat-card--danger {
+  border-color: rgba(192, 57, 43, 0.25);
+}
+
+.stat-card-icon-text {
+  font-size: var(--fs-13);
+  font-weight: 700;
+}
+
 /* ==========================================================================
    Card
    ========================================================================== */
@@ -805,6 +821,11 @@ table {
 .badge-out {
   background: var(--danger-dim);
   color: var(--danger);
+}
+
+.badge-alto {
+  background: var(--orange-dim);
+  color: var(--orange);
 }
 
 .badge-info {

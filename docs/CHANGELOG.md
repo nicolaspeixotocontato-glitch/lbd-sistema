@@ -19,8 +19,82 @@
 - `e54b0ae` — Adicionar aba Pedidos com lista de compras por loja e por fornecedor
 - `90fe0fc` — Corrigir migracao de fornecedores para dados ja salvos no navegador
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
+- `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das duas sprints mais recentes abaixo.
+Detalhamento das sprints mais recentes abaixo (Sprint 2 — Central de Compras primeiro,
+por ser a mais nova).
+
+---
+
+## 2026-07-10 — Sprint 2: Central de Compras
+
+**Objetivo da sprint:** transformar `pedidos.html` de uma lista de reposição em uma
+central de compras que apoia a decisão de quem compra insumos para múltiplas lojas todo
+dia — priorizando velocidade operacional (menos cliques, menos erros), sem alterar
+arquitetura, backend, LocalStorage ou regras de negócio existentes.
+
+### Adicionado
+
+- **Criticidade por item** (`getCriticidade(pct, status)`, novo em `assets/app.js`): 4
+  níveis — Crítico (zerado), Alto (`pct < 50%`), Médio (`pct` 50–80%), Baixo (`pct` 80–100%)
+  — com badge dedicado por nível (`badge-out`, novo `badge-alto`, `badge-low`,
+  `badge-neutral`), visível em ambas as seções da tela.
+- **Ordenação por prioridade**: itens ordenados por criticidade (mais crítico primeiro,
+  depois alfabético) em "Por loja" e "Por fornecedor"; fornecedores ordenados pelo item
+  mais crítico que carregam, com valor total como critério de desempate.
+- **Bloco "Sem fornecedor definido"**: corrige um bug em que itens sem `fornecedorId`
+  cadastrado desapareciam silenciosamente da seção "Por fornecedor" — agora aparecem num
+  bloco próprio, visível e sinalizado.
+- **Resumo executivo** (topo da tela): itens a repor, itens críticos, fornecedores
+  envolvidos e valor total estimado — sempre reflete o total real, independente dos
+  filtros ativos.
+- **Filtros**: por loja (reaproveita o padrão `loja-tabs`), por fornecedor e por
+  categoria (`filter-chips`) — só aparecem chips de fornecedores/categorias que
+  realmente têm item pendente no momento.
+- **Seleção múltipla de itens**: checkbox por item e checkbox "selecionar todos" por
+  fornecedor na seção "Por fornecedor"; todos os itens vêm selecionados por padrão.
+  Estado em memória (`Set` de ids), nunca gravado no `localStorage`.
+- **Seleção rápida**: botões "Selecionar todos", "Selecionar apenas críticos" e "Limpar
+  seleção" — atuam sobre o conjunto de itens *atualmente filtrado*, não sobre todo o
+  sistema.
+- **Resumo dinâmico da seleção**: atualiza ao vivo a cada mudança de seleção — itens
+  selecionados, quantidade total agrupada por unidade (ex.: "18 kg, 45 un, 6 L", evitando
+  somar unidades diferentes de forma incorreta), valor estimado e fornecedores
+  envolvidos.
+- **Campo de observação do pedido**: texto livre, em memória (não persistido), incluído
+  automaticamente no final da mensagem de WhatsApp.
+- **Botão "Copiar para WhatsApp"** por fornecedor: monta uma mensagem só com os itens
+  selecionados daquele fornecedor + a observação, copia para a área de transferência
+  (`navigator.clipboard.writeText`, com fallback avisado caso falhe) e abre
+  `https://wa.me/?text=...` para o usuário escolher o contato — sem precisar de telefone
+  cadastrado do fornecedor.
+- **Exportar CSV**: exporta os itens selecionados dos fornecedores atualmente
+  filtrados/exibidos, com criticidade e subtotal por linha; segue o mesmo padrão e a
+  mesma permissão (`exportar_dados`) já usados em Estoque/Histórico.
+- Novos tokens de design reutilizáveis em `assets/style.css`: `--orange`/`--orange-dim`
+  e `.badge-alto`; `.stat-card--danger` e `.stat-card-icon-text` promovidos de estilo
+  local (só existiam em `painel.html`) para o design system compartilhado.
+
+### Revisão pós-implementação
+
+Uma passada de revisão encontrou uma pequena redundância de cálculo: `renderTudo()`
+chamava duas funções que recalculavam `getTodosItensPendentes()` independentemente.
+Corrigido computando uma vez e reaproveitando nas duas (parâmetro opcional, com fallback
+para quem chama essas funções fora do fluxo de `renderTudo()`, como os handlers de
+seleção). Nenhum bug de comportamento encontrado além do já descrito acima (bloco "Sem
+fornecedor definido").
+
+### Verificação
+
+Testado manualmente em servidor local (login como admin, gerente e operador): resumo
+executivo, ordenação de itens e fornecedores por criticidade, os 4 badges de criticidade,
+filtros combinados (loja + fornecedor + categoria), as 3 ações de seleção rápida, resumo
+dinâmico após cada mudança de seleção, mensagem de WhatsApp (conteúdo e itens corretos,
+observação incluída), exportação CSV (conteúdo e respeito ao filtro/seleção ativos),
+correção do bloco "Sem fornecedor definido" com um item de teste criado propositalmente
+sem fornecedor, permissões (gerente restrito à própria loja e sem exportar CSV; operador
+bloqueado, como já era o caso) e regressão em Painel, Estoque e Etiquetas. Nenhum erro de
+console em nenhum momento.
 
 ---
 

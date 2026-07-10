@@ -313,6 +313,15 @@ function getStatusEstoque(item, lojaId) {
   return { status: 'ok', label: 'Em estoque', pct };
 }
 
+const CRITICIDADE_ORDEM = { critico: 3, alto: 2, medio: 1, baixo: 0 };
+
+function getCriticidade(pct, status) {
+  if (status === 'out') return { nivel: 'critico', label: 'Crítico' };
+  if (pct < 50) return { nivel: 'alto', label: 'Alto' };
+  if (pct < 80) return { nivel: 'medio', label: 'Médio' };
+  return { nivel: 'baixo', label: 'Baixo' };
+}
+
 function getItensAbaixoMinimo(lojaId) {
   const data = getData();
   return data.itens.filter((item) => {

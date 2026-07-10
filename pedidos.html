@@ -41,6 +41,10 @@
     .preco-indicador.is-bom {
       color: var(--success);
     }
+
+    .chk-col {
+      width: 36px;
+    }
   </style>
 </head>
 <body>
@@ -53,9 +57,11 @@
       <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap; gap:12px;">
         <div>
           <h1 class="page-title">Pedidos</h1>
-          <p class="page-subtitle">Lista de compras e reposição de estoque</p>
+          <p class="page-subtitle">Central de compras — reposição de estoque por loja e por fornecedor</p>
         </div>
       </div>
+
+      <div class="stat-grid mb-16" id="resumo-executivo"></div>
 
       <div class="flex items-center justify-between mb-16">
         <span class="section-title">Por loja</span>
@@ -67,35 +73,280 @@
       <div class="flex items-center justify-between mb-16">
         <span class="section-title">Por fornecedor</span>
       </div>
+
+      <div class="card mb-16">
+        <div class="card-body flex flex-col gap-16">
+          <div class="loja-tabs" id="loja-tabs-pedidos"></div>
+          <div class="filter-chips" id="fornecedor-chips"></div>
+          <div class="filter-chips" id="categoria-chips-pedidos"></div>
+        </div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-body flex flex-col gap-16">
+          <div class="flex items-center justify-between" style="flex-wrap:wrap; gap:8px;">
+            <div class="flex gap-8" style="flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" id="btn-selecionar-todos" type="button">Selecionar todos</button>
+              <button class="btn btn-secondary btn-sm" id="btn-selecionar-criticos" type="button">Selecionar apenas críticos</button>
+              <button class="btn btn-ghost btn-sm" id="btn-limpar-selecao" type="button">Limpar seleção</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-exportar-csv-pedidos" type="button">Exportar CSV</button>
+          </div>
+          <div class="stat-grid" id="resumo-selecao"></div>
+        </div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-body">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="observacao-pedido">Observação do pedido (opcional)</label>
+            <textarea class="form-textarea" id="observacao-pedido" placeholder="Ex: entregar até sexta-feira, ligar antes de vir..." rows="2"></textarea>
+            <div class="form-hint">Não é salva — vale só para esta sessão e entra automaticamente na mensagem do WhatsApp.</div>
+          </div>
+        </div>
+      </div>
+
       <div id="pedidos-por-fornecedor"></div>
     </main>
   </div>
 
   <script src="assets/app.js"></script>
   <script>
+    /* ==========================================================================
+       Estado da tela (tudo em memória — nada aqui é salvo no localStorage)
+       ========================================================================== */
+
+    let itensSelecionados = new Set();
+    let filtroLojaPedidos = 'todas';
+    let filtroFornecedorPedidos = 'todos';
+    let filtroCategoriaPedidos = 'todas';
+    let blocosFornecedorAtuais = [];
+
+    const FORNECEDOR_SEM_ID = 'sem-fornecedor';
+    const FORNECEDOR_SEM_CADASTRO = { id: FORNECEDOR_SEM_ID, nome: 'Sem fornecedor definido', tipo: null };
+
+    /* ==========================================================================
+       Cálculo de dados (funções puras, sem tocar no DOM)
+       ========================================================================== */
+
+    function getLojasEscopo() {
+      return filtroLojaPedidos === 'todas' ? lojasPermitidas().map((l) => l.id) : [filtroLojaPedidos];
+    }
+
+    function precoEstimado(item) {
+      const ultimo = getUltimoPrecoPago(item.id);
+      return ultimo ? ultimo.precoPago : item.precoUnit;
+    }
+
+    // Agrega itens abaixo do mínimo entre um conjunto de lojas — sem filtro de categoria/fornecedor.
+    function agregarItensPorLojas(lojaIds) {
+      const mapa = {};
+
+      lojaIds.forEach((lojaId) => {
+        getItensAbaixoMinimo(lojaId).forEach((item) => {
+          const atual = item.qty[lojaId] ?? 0;
+          const min = item.min[lojaId] ?? 0;
+          const aPedir = Math.max(min - atual, 0);
+          if (aPedir <= 0) return;
+
+          const st = getStatusEstoque(item, lojaId);
+          const crit = getCriticidade(st.pct, st.status);
+
+          if (!mapa[item.id]) mapa[item.id] = { item, qtd: 0, piorNivel: crit.nivel };
+          mapa[item.id].qtd += aPedir;
+          if (CRITICIDADE_ORDEM[crit.nivel] > CRITICIDADE_ORDEM[mapa[item.id].piorNivel]) {
+            mapa[item.id].piorNivel = crit.nivel;
+          }
+        });
+      });
+
+      return Object.values(mapa);
+    }
+
+    // Todos os itens pendentes em todas as lojas permitidas ao usuário — ignora os filtros da tela.
+    // Usado nos resumos (executivo e de seleção), que devem refletir o total real, não só o que está filtrado à vista.
+    function getTodosItensPendentes() {
+      return agregarItensPorLojas(lojasPermitidas().map((l) => l.id));
+    }
+
+    // Itens pendentes respeitando os filtros de loja e categoria ativos na tela.
+    function getItensPedidoFiltrado() {
+      let linhas = agregarItensPorLojas(getLojasEscopo());
+      if (filtroCategoriaPedidos !== 'todas') {
+        linhas = linhas.filter((l) => l.item.cat === filtroCategoriaPedidos);
+      }
+      return linhas;
+    }
+
+    function ordenarPorCriticidade(linhas) {
+      return linhas.slice().sort((a, b) => {
+        const diff = CRITICIDADE_ORDEM[b.piorNivel] - CRITICIDADE_ORDEM[a.piorNivel];
+        if (diff !== 0) return diff;
+        return a.item.nome.localeCompare(b.item.nome, 'pt-BR');
+      });
+    }
+
+    // Agrupa linhas (já filtradas) por fornecedor, soma valor total e ordena por urgência/valor.
+    function getBlocosFornecedor(linhas) {
+      const grupos = {};
+      linhas.forEach((l) => {
+        const fid = l.item.fornecedorId || FORNECEDOR_SEM_ID;
+        if (!grupos[fid]) grupos[fid] = [];
+        grupos[fid].push(l);
+      });
+
+      const todosFornecedores = [...FORNECEDORES, FORNECEDOR_SEM_CADASTRO];
+
+      let blocos = todosFornecedores
+        .filter((f) => grupos[f.id] && grupos[f.id].length > 0)
+        .map((f) => {
+          const itens = ordenarPorCriticidade(grupos[f.id]);
+          const piorNivelBloco = itens.reduce(
+            (pior, l) => (CRITICIDADE_ORDEM[l.piorNivel] > CRITICIDADE_ORDEM[pior] ? l.piorNivel : pior),
+            'baixo'
+          );
+          const valorTotal = itens.reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+          return { fornecedor: f, itens, piorNivelBloco, valorTotal };
+        });
+
+      if (filtroFornecedorPedidos !== 'todos') {
+        blocos = blocos.filter((b) => b.fornecedor.id === filtroFornecedorPedidos);
+      }
+
+      blocos.sort((a, b) => {
+        const diff = CRITICIDADE_ORDEM[b.piorNivelBloco] - CRITICIDADE_ORDEM[a.piorNivelBloco];
+        if (diff !== 0) return diff;
+        return b.valorTotal - a.valorTotal;
+      });
+
+      return blocos;
+    }
+
+    function haFiltrosAtivos() {
+      return filtroLojaPedidos !== 'todas' || filtroFornecedorPedidos !== 'todos' || filtroCategoriaPedidos !== 'todas';
+    }
+
+    /* ==========================================================================
+       Criticidade — badge visual
+       ========================================================================== */
+
+    function criticidadeBadge(nivel) {
+      const mapa = {
+        critico: { label: 'Crítico', cls: 'badge-out' },
+        alto: { label: 'Alto', cls: 'badge-alto' },
+        medio: { label: 'Médio', cls: 'badge-low' },
+        baixo: { label: 'Baixo', cls: 'badge-neutral' },
+      };
+      return mapa[nivel] || mapa.baixo;
+    }
+
+    function htmlBadgeCriticidade(nivel) {
+      const b = criticidadeBadge(nivel);
+      return `<span class="badge ${b.cls}">${b.label}</span>`;
+    }
+
+    /* ==========================================================================
+       A1 — Resumo executivo
+       ========================================================================== */
+
+    function renderResumoExecutivo(linhasPendentes) {
+      const linhas = linhasPendentes || getTodosItensPendentes();
+      const criticos = linhas.filter((l) => l.piorNivel === 'critico').length;
+      const fornecedoresSet = new Set(linhas.map((l) => l.item.fornecedorId || FORNECEDOR_SEM_ID));
+      const valorTotal = linhas.reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+
+      const cards = [
+        { label: 'Itens a repor', value: fmt(linhas.length), icon: ICONS.estoque, variant: 'mint' },
+        { label: 'Itens críticos', value: fmt(criticos), icon: ICONS.alert, variant: 'danger' },
+        { label: 'Fornecedores envolvidos', value: fmt(fornecedoresSet.size), icon: ICONS.pedidos, variant: 'gold' },
+        { label: 'Valor total estimado', value: fmtR(valorTotal), icon: null, variant: 'success' },
+      ];
+
+      document.getElementById('resumo-executivo').innerHTML = cards.map((c) => `
+        <div class="stat-card stat-card--${c.variant}">
+          <div class="stat-card-icon">${c.icon || '<span class="stat-card-icon-text">R$</span>'}</div>
+          <div class="stat-card-value">${c.value}</div>
+          <div class="stat-card-label">${c.label}</div>
+        </div>
+      `).join('');
+    }
+
+    /* ==========================================================================
+       Acréscimo 4 — Resumo dinâmico da seleção
+       ========================================================================== */
+
+    function atualizarResumoSelecao(linhasPendentes) {
+      const linhas = linhasPendentes || getTodosItensPendentes();
+      const selecionadas = linhas.filter((l) => itensSelecionados.has(l.item.id));
+
+      const qtdPorUnidade = {};
+      let valorTotal = 0;
+      const fornecedoresEnvolvidos = new Set();
+
+      selecionadas.forEach((l) => {
+        qtdPorUnidade[l.item.un] = (qtdPorUnidade[l.item.un] || 0) + l.qtd;
+        valorTotal += l.qtd * precoEstimado(l.item);
+        fornecedoresEnvolvidos.add(l.item.fornecedorId || FORNECEDOR_SEM_ID);
+      });
+
+      const quantidadeTotalTexto = Object.keys(qtdPorUnidade).length === 0
+        ? '—'
+        : Object.entries(qtdPorUnidade)
+            .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+            .map(([un, qtd]) => `${fmt(qtd)} ${un}`)
+            .join(', ');
+
+      const cards = [
+        { label: 'Itens selecionados', value: fmt(selecionadas.length), icon: ICONS.check, variant: 'mint' },
+        { label: 'Quantidade total', value: quantidadeTotalTexto, icon: ICONS.estoque, variant: 'gold' },
+        { label: 'Valor estimado', value: fmtR(valorTotal), icon: null, variant: 'success' },
+        { label: 'Fornecedores envolvidos', value: fmt(fornecedoresEnvolvidos.size), icon: ICONS.pedidos, variant: 'warning' },
+      ];
+
+      document.getElementById('resumo-selecao').innerHTML = cards.map((c) => `
+        <div class="stat-card stat-card--${c.variant}">
+          <div class="stat-card-icon">${c.icon || '<span class="stat-card-icon-text">R$</span>'}</div>
+          <div class="stat-card-value">${c.value}</div>
+          <div class="stat-card-label">${c.label}</div>
+        </div>
+      `).join('');
+    }
+
+    /* ==========================================================================
+       Por loja
+       ========================================================================== */
+
     function linhaItemLoja(item, lojaId) {
       const atual = item.qty[lojaId] ?? 0;
       const min = item.min[lojaId] ?? 0;
       const aPedir = Math.max(min - atual, 0);
-      return `
-        <tr>
-          <td>${item.nome}</td>
-          <td class="td-num">${fmt(atual)} ${item.un}</td>
-          <td class="td-num">${fmt(min)} ${item.un}</td>
-          <td class="td-num" style="font-weight:600">${fmt(aPedir)} ${item.un}</td>
-        </tr>
-      `;
+      const st = getStatusEstoque(item, lojaId);
+      const crit = getCriticidade(st.pct, st.status);
+      return { item, aPedir, atual, min, crit };
     }
 
     function renderPorLoja() {
       const container = document.getElementById('pedidos-por-loja');
-      const lojas = lojasPermitidas();
+      const todasLojas = lojasPermitidas();
+      const lojas = filtroLojaPedidos === 'todas' ? todasLojas : todasLojas.filter((l) => l.id === filtroLojaPedidos);
 
       container.innerHTML = lojas.map((loja, idx) => {
-        const itens = getItensAbaixoMinimo(loja.id);
+        let itens = getItensAbaixoMinimo(loja.id).map((item) => linhaItemLoja(item, loja.id)).filter((l) => l.aPedir > 0);
+        if (filtroCategoriaPedidos !== 'todas') {
+          itens = itens.filter((l) => l.item.cat === filtroCategoriaPedidos);
+        }
+        itens.sort((a, b) => {
+          const diff = CRITICIDADE_ORDEM[b.crit.nivel] - CRITICIDADE_ORDEM[a.crit.nivel];
+          return diff !== 0 ? diff : a.item.nome.localeCompare(b.item.nome, 'pt-BR');
+        });
+
         const separador = idx > 0 ? 'style="border-top:1px solid var(--border-subtle); padding-top:20px;"' : '';
 
         if (itens.length === 0) {
+          const titulo = haFiltrosAtivos() ? 'Nenhum item com os filtros atuais' : 'Nenhum item abaixo do mínimo';
+          const subtitulo = haFiltrosAtivos()
+            ? 'Ajuste os filtros para ver outros resultados.'
+            : 'Esta loja não precisa de reposição no momento.';
           return `
             <div class="loja-bloco" ${separador}>
               <div class="flex items-center justify-between mb-16">
@@ -104,14 +355,22 @@
               </div>
               <div class="empty-state">
                 <span class="empty-state-icon">${ICONS.check}</span>
-                <div class="empty-state-title">Nenhum item abaixo do mínimo</div>
-                <div class="empty-state-subtitle">Esta loja não precisa de reposição no momento.</div>
+                <div class="empty-state-title">${titulo}</div>
+                <div class="empty-state-subtitle">${subtitulo}</div>
               </div>
             </div>
           `;
         }
 
-        const linhas = itens.map((item) => linhaItemLoja(item, loja.id)).join('');
+        const linhas = itens.map((l) => `
+          <tr>
+            <td>${htmlBadgeCriticidade(l.crit.nivel)}</td>
+            <td>${l.item.nome}</td>
+            <td class="td-num">${fmt(l.atual)} ${l.item.un}</td>
+            <td class="td-num">${fmt(l.min)} ${l.item.un}</td>
+            <td class="td-num" style="font-weight:600">${fmt(l.aPedir)} ${l.item.un}</td>
+          </tr>
+        `).join('');
 
         return `
           <div class="loja-bloco" ${separador}>
@@ -123,6 +382,7 @@
               <table class="table">
                 <thead>
                   <tr>
+                    <th>Criticidade</th>
                     <th>Item</th>
                     <th class="td-num">Estoque atual</th>
                     <th class="td-num">Mínimo</th>
@@ -137,6 +397,42 @@
       }).join('');
     }
 
+    /* ==========================================================================
+       Filtros (B1, B2, B3)
+       ========================================================================== */
+
+    function renderFiltros() {
+      const permitidas = lojasPermitidas();
+      const opcoesLoja = permitidas.length > 1
+        ? [{ id: 'todas', label: 'Todas' }, ...permitidas.map((l) => ({ id: l.id, label: l.id }))]
+        : permitidas.map((l) => ({ id: l.id, label: l.id }));
+      document.getElementById('loja-tabs-pedidos').innerHTML = opcoesLoja.map((o) => `
+        <button type="button" class="loja-tab${o.id === filtroLojaPedidos ? ' is-active' : ''}" onclick="setFiltroLojaPedidos('${o.id}')">${o.label}</button>
+      `).join('');
+
+      const linhasBase = getItensPedidoFiltrado();
+      const fornecedoresComItens = new Set(linhasBase.map((l) => l.item.fornecedorId || FORNECEDOR_SEM_ID));
+      const todosFornecedores = [...FORNECEDORES, FORNECEDOR_SEM_CADASTRO];
+      const opcoesFornecedor = [{ id: 'todos', nome: 'Todos' }, ...todosFornecedores.filter((f) => fornecedoresComItens.has(f.id))];
+      document.getElementById('fornecedor-chips').innerHTML = opcoesFornecedor.map((f) => `
+        <button type="button" class="filter-chip${f.id === filtroFornecedorPedidos ? ' is-active' : ''}" onclick="setFiltroFornecedorPedidos('${f.id}')">${f.nome}</button>
+      `).join('');
+
+      const categoriasComItens = [...new Set(linhasBase.map((l) => l.item.cat))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      const opcoesCategoria = ['todas', ...categoriasComItens];
+      document.getElementById('categoria-chips-pedidos').innerHTML = opcoesCategoria.map((c) => `
+        <button type="button" class="filter-chip${c === filtroCategoriaPedidos ? ' is-active' : ''}" onclick="setFiltroCategoriaPedidos('${c}')">${c === 'todas' ? 'Todas categorias' : c}</button>
+      `).join('');
+    }
+
+    function setFiltroLojaPedidos(id) { filtroLojaPedidos = id; renderTudo(); }
+    function setFiltroFornecedorPedidos(id) { filtroFornecedorPedidos = id; renderTudo(); }
+    function setFiltroCategoriaPedidos(c) { filtroCategoriaPedidos = c; renderTudo(); }
+
+    /* ==========================================================================
+       Por fornecedor + seleção (A5) + WhatsApp (A6)
+       ========================================================================== */
+
     function iconIndicadorPreco(status) {
       if (status === 'caro') return ICONS['arrow-up'];
       if (status === 'bom') return ICONS['arrow-down'];
@@ -149,101 +445,48 @@
       return 'Preço médio';
     }
 
-    function getTotaisAPedirPorItem() {
-      const lojas = lojasPermitidas();
-      const totais = {};
+    function labelTipoFornecedor(tipo) {
+      if (tipo === 'atacado') return '<span class="badge badge-info">Compra no atacado</span>';
+      if (tipo === 'fornecedor') return '<span class="badge badge-neutral">Pedido direto</span>';
+      return '<span class="badge badge-neutral">Sem fornecedor cadastrado</span>';
+    }
 
-      lojas.forEach((loja) => {
-        getItensAbaixoMinimo(loja.id).forEach((item) => {
-          const atual = item.qty[loja.id] ?? 0;
-          const min = item.min[loja.id] ?? 0;
-          const aPedir = Math.max(min - atual, 0);
-          if (aPedir <= 0) return;
-          totais[item.id] = (totais[item.id] || 0) + aPedir;
-        });
+    function toggleItemSelecionado(itemId) {
+      if (itensSelecionados.has(itemId)) itensSelecionados.delete(itemId);
+      else itensSelecionados.add(itemId);
+      renderPorFornecedor();
+      atualizarResumoSelecao();
+    }
+
+    function toggleFornecedorSelecionado(fornecedorId, estavaTudoMarcado) {
+      const bloco = blocosFornecedorAtuais.find((b) => b.fornecedor.id === fornecedorId);
+      if (!bloco) return;
+      const marcar = !estavaTudoMarcado;
+      bloco.itens.forEach((l) => {
+        if (marcar) itensSelecionados.add(l.item.id);
+        else itensSelecionados.delete(l.item.id);
       });
-
-      return totais;
+      renderPorFornecedor();
+      atualizarResumoSelecao();
     }
 
     function renderPorFornecedor() {
+      const linhas = getItensPedidoFiltrado();
+      blocosFornecedorAtuais = getBlocosFornecedor(linhas);
       const container = document.getElementById('pedidos-por-fornecedor');
-      const data = getData();
-      const totais = getTotaisAPedirPorItem();
 
-      const porFornecedor = {};
-      Object.keys(totais).forEach((itemId) => {
-        const item = data.itens.find((i) => i.id === itemId);
-        if (!item || !item.fornecedorId) return;
-        if (!porFornecedor[item.fornecedorId]) porFornecedor[item.fornecedorId] = [];
-        porFornecedor[item.fornecedorId].push({ item, qtd: totais[itemId] });
-      });
-
-      const blocos = FORNECEDORES
-        .filter((f) => porFornecedor[f.id] && porFornecedor[f.id].length > 0)
-        .map((forn) => {
-          let valorTotal = 0;
-
-          const linhas = porFornecedor[forn.id].map(({ item, qtd }) => {
-            const ultimo = getUltimoPrecoPago(item.id);
-            const indicador = getIndicadorPreco(item.id);
-            const precoUltimo = ultimo ? ultimo.precoPago : item.precoUnit;
-            valorTotal += qtd * precoUltimo;
-
-            return `
-              <tr>
-                <td>${item.nome}</td>
-                <td class="td-num">${fmt(qtd)} ${item.un}</td>
-                <td class="td-num">${fmtR(precoUltimo)}</td>
-                <td>
-                  <span class="preco-indicador is-${indicador.status}">
-                    ${iconIndicadorPreco(indicador.status)} ${labelIndicadorPreco(indicador.status)}
-                  </span>
-                </td>
-              </tr>
-            `;
-          }).join('');
-
-          const badgeTipo = forn.tipo === 'atacado'
-            ? '<span class="badge badge-info">Compra no atacado</span>'
-            : '<span class="badge badge-neutral">Pedido direto</span>';
-
-          return `
-            <div class="card fornecedor-bloco">
-              <div class="card-header">
-                <div class="flex items-center gap-8">
-                  <span class="card-title">${forn.nome}</span>
-                  ${badgeTipo}
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th class="td-num">Qtd. a pedir</th>
-                      <th class="td-num">Último preço pago</th>
-                      <th>Tendência</th>
-                    </tr>
-                  </thead>
-                  <tbody>${linhas}</tbody>
-                </table>
-              </div>
-              <div class="card-footer">
-                <span style="font-weight:600">Total estimado do pedido: ${fmtR(valorTotal)}</span>
-              </div>
-            </div>
-          `;
-        }).join('');
-
-      if (!blocos) {
+      if (blocosFornecedorAtuais.length === 0) {
+        const titulo = haFiltrosAtivos() ? 'Nenhum item encontrado' : 'Nenhum pedido necessário';
+        const subtitulo = haFiltrosAtivos()
+          ? 'Ajuste os filtros para ver outros resultados.'
+          : 'Todos os itens estão dentro do estoque mínimo.';
         container.innerHTML = `
           <div class="card">
             <div class="card-body">
               <div class="empty-state">
                 <span class="empty-state-icon">${ICONS.check}</span>
-                <div class="empty-state-title">Nenhum pedido necessário</div>
-                <div class="empty-state-subtitle">Todos os itens estão dentro do estoque mínimo.</div>
+                <div class="empty-state-title">${titulo}</div>
+                <div class="empty-state-subtitle">${subtitulo}</div>
               </div>
             </div>
           </div>
@@ -251,12 +494,207 @@
         return;
       }
 
-      container.innerHTML = blocos;
+      container.innerHTML = blocosFornecedorAtuais.map((bloco) => {
+        const f = bloco.fornecedor;
+        const itemIds = bloco.itens.map((l) => l.item.id);
+        const todosMarcados = itemIds.length > 0 && itemIds.every((id) => itensSelecionados.has(id));
+        const itensSelecionadosCount = itemIds.filter((id) => itensSelecionados.has(id)).length;
+        const valorSelecionado = bloco.itens
+          .filter((l) => itensSelecionados.has(l.item.id))
+          .reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+
+        const linhasHtml = bloco.itens.map((l) => {
+          const marcado = itensSelecionados.has(l.item.id);
+          const indicador = getIndicadorPreco(l.item.id);
+          const precoUltimo = precoEstimado(l.item);
+
+          return `
+            <tr>
+              <td><input type="checkbox" class="chk-item-pedido" aria-label="Selecionar ${l.item.nome}" ${marcado ? 'checked' : ''} onchange="toggleItemSelecionado('${l.item.id}')"></td>
+              <td>${htmlBadgeCriticidade(l.piorNivel)}</td>
+              <td>${l.item.nome}</td>
+              <td class="td-num">${fmt(l.qtd)} ${l.item.un}</td>
+              <td class="td-num">${fmtR(precoUltimo)}</td>
+              <td>
+                <span class="preco-indicador is-${indicador.status}">
+                  ${iconIndicadorPreco(indicador.status)} ${labelIndicadorPreco(indicador.status)}
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        return `
+          <div class="card fornecedor-bloco">
+            <div class="card-header">
+              <div class="flex items-center gap-8" style="flex-wrap:wrap;">
+                <input type="checkbox" aria-label="Selecionar todos de ${f.nome}" ${todosMarcados ? 'checked' : ''} onchange="toggleFornecedorSelecionado('${f.id}', ${todosMarcados})">
+                <span class="card-title">${f.nome}</span>
+                ${labelTipoFornecedor(f.tipo)}
+                ${htmlBadgeCriticidade(bloco.piorNivelBloco)}
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th class="chk-col"></th>
+                    <th>Criticidade</th>
+                    <th>Item</th>
+                    <th class="td-num">Qtd. a pedir</th>
+                    <th class="td-num">Último preço pago</th>
+                    <th>Tendência</th>
+                  </tr>
+                </thead>
+                <tbody>${linhasHtml}</tbody>
+              </table>
+            </div>
+            <div class="card-footer flex items-center justify-between" style="flex-wrap:wrap; gap:8px;">
+              <span style="font-weight:600">${itensSelecionadosCount}/${itemIds.length} selecionados — Total: ${fmtR(valorSelecionado)}</span>
+              <button class="btn btn-secondary btn-sm" type="button" onclick="copiarPedidoWhatsApp('${f.id}')" ${itensSelecionadosCount === 0 ? 'disabled' : ''}>Copiar para WhatsApp</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* ==========================================================================
+       Acréscimo 2 — Observação + Acréscimo A6 — Copiar para WhatsApp
+       ========================================================================== */
+
+    function montarMensagemWhatsApp(bloco) {
+      const itensDoBlocoSelecionados = bloco.itens.filter((l) => itensSelecionados.has(l.item.id));
+      if (itensDoBlocoSelecionados.length === 0) return null;
+
+      const linhasTexto = itensDoBlocoSelecionados.map((l) => `• ${l.item.nome} — ${fmt(l.qtd)} ${l.item.un}`).join('\n');
+      const valorTotal = itensDoBlocoSelecionados.reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+      const observacao = document.getElementById('observacao-pedido').value.trim();
+
+      let mensagem = `Pedido — ${bloco.fornecedor.nome}\n\n${linhasTexto}\n\nTotal estimado: ${fmtR(valorTotal)}`;
+      if (observacao) mensagem += `\n\nObs: ${observacao}`;
+      return mensagem;
+    }
+
+    async function copiarPedidoWhatsApp(fornecedorId) {
+      const bloco = blocosFornecedorAtuais.find((b) => b.fornecedor.id === fornecedorId);
+      if (!bloco) return;
+
+      const mensagem = montarMensagemWhatsApp(bloco);
+      if (!mensagem) {
+        toast('Nenhum item selecionado deste fornecedor.', 'error');
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(mensagem);
+        toast('Pedido copiado! Abrindo o WhatsApp...', 'success');
+      } catch (e) {
+        toast('Não foi possível copiar automaticamente — abrindo o WhatsApp mesmo assim.', 'warning');
+      }
+
+      window.open(`https://wa.me/?text=${encodeURIComponent(mensagem)}`, '_blank');
+    }
+
+    /* ==========================================================================
+       Acréscimo 3 — Seleção rápida
+       ========================================================================== */
+
+    document.getElementById('btn-selecionar-todos').addEventListener('click', () => {
+      getItensPedidoFiltrado().forEach((l) => itensSelecionados.add(l.item.id));
+      renderPorFornecedor();
+      atualizarResumoSelecao();
+    });
+
+    document.getElementById('btn-selecionar-criticos').addEventListener('click', () => {
+      getItensPedidoFiltrado().forEach((l) => {
+        if (l.piorNivel === 'critico') itensSelecionados.add(l.item.id);
+        else itensSelecionados.delete(l.item.id);
+      });
+      renderPorFornecedor();
+      atualizarResumoSelecao();
+    });
+
+    document.getElementById('btn-limpar-selecao').addEventListener('click', () => {
+      getItensPedidoFiltrado().forEach((l) => itensSelecionados.delete(l.item.id));
+      renderPorFornecedor();
+      atualizarResumoSelecao();
+    });
+
+    /* ==========================================================================
+       B4 — Exportar CSV
+       ========================================================================== */
+
+    function exportarCSVPedidos() {
+      if (!checkPermissao('exportar_dados')) {
+        toast('Você não tem permissão para exportar dados.', 'error');
+        return;
+      }
+
+      const linhasCsv = [];
+      blocosFornecedorAtuais.forEach((bloco) => {
+        bloco.itens.forEach((l) => {
+          if (!itensSelecionados.has(l.item.id)) return;
+          const precoUltimo = precoEstimado(l.item);
+          linhasCsv.push([
+            bloco.fornecedor.nome,
+            bloco.fornecedor.tipo === 'atacado' ? 'Compra no atacado' : bloco.fornecedor.tipo === 'fornecedor' ? 'Pedido direto' : 'Sem fornecedor cadastrado',
+            l.item.nome,
+            l.item.cat,
+            l.qtd,
+            l.item.un,
+            criticidadeBadge(l.piorNivel).label,
+            precoUltimo.toFixed(2),
+            (l.qtd * precoUltimo).toFixed(2),
+          ]);
+        });
+      });
+
+      if (linhasCsv.length === 0) {
+        toast('Nenhum item selecionado para exportar.', 'error');
+        return;
+      }
+
+      const header = ['Fornecedor', 'Tipo', 'Item', 'Categoria', 'Quantidade', 'UN', 'Criticidade', 'Preço unit. estimado', 'Subtotal'];
+      const csv = [header, ...linhasCsv]
+        .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+        .join('\r\n');
+
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pedido_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('btn-exportar-csv-pedidos').addEventListener('click', exportarCSVPedidos);
+
+    /* ==========================================================================
+       Orquestração + init
+       ========================================================================== */
+
+    function renderTudo() {
+      const linhasPendentes = getTodosItensPendentes();
+      renderFiltros();
+      renderResumoExecutivo(linhasPendentes);
+      renderPorLoja();
+      renderPorFornecedor();
+      atualizarResumoSelecao(linhasPendentes);
+    }
+
+    function inicializarSelecaoPadrao() {
+      itensSelecionados = new Set(getTodosItensPendentes().map((l) => l.item.id));
     }
 
     initTopbar('pedidos');
-    renderPorLoja();
-    renderPorFornecedor();
+    if (!checkPermissao('exportar_dados')) {
+      document.getElementById('btn-exportar-csv-pedidos').style.display = 'none';
+    }
+    inicializarSelecaoPadrao();
+    renderTudo();
   </script>
 </body>
 </html>
