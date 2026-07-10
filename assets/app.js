@@ -575,6 +575,7 @@ function abrirSeletorLoja() {
 let _scannerQRStream = null;
 let _scannerQRLoopId = null;
 let _scannerQRCallback = null;
+let _scannerQRCanvas = null;
 
 function fecharScannerQR() {
   if (_scannerQRLoopId) cancelAnimationFrame(_scannerQRLoopId);
@@ -596,20 +597,25 @@ async function iniciarCameraScanner() {
     video.srcObject = _scannerQRStream;
     await video.play();
 
-    const detector = new BarcodeDetector({ formats: ['qr_code'] });
-    const loop = async () => {
+    if (!_scannerQRCanvas) _scannerQRCanvas = document.createElement('canvas');
+    const canvas = _scannerQRCanvas;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const loop = () => {
       if (!_scannerQRStream) return;
-      try {
-        const codigos = await detector.detect(video);
-        if (codigos.length > 0) {
-          const texto = codigos[0].rawValue;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const codigo = jsQR(imageData.data, imageData.width, imageData.height);
+        if (codigo) {
+          const texto = codigo.data;
           const callback = _scannerQRCallback;
           fecharScannerQR();
           if (callback) callback(texto);
           return;
         }
-      } catch (e) {
-        // erro transitório de detecção — ignora e tenta no próximo quadro
       }
       _scannerQRLoopId = requestAnimationFrame(loop);
     };
@@ -620,11 +626,6 @@ async function iniciarCameraScanner() {
 }
 
 function abrirScannerQR(onDetectado) {
-  if (!('BarcodeDetector' in window)) {
-    toast('Seu navegador não suporta leitura de QR Code pela câmera. Use a busca por nome.', 'warning');
-    return;
-  }
-
   let modal = document.getElementById('modal-scanner-qr');
   if (!modal) {
     modal = document.createElement('div');
