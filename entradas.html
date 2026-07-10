@@ -222,7 +222,12 @@
           <div class="form-row">
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" for="manual-item-select">Item</label>
-              <select class="form-select" id="manual-item-select"></select>
+              <div class="flex gap-8">
+                <select class="form-select" id="manual-item-select" style="flex:1"></select>
+                <button class="btn btn-secondary btn-md" id="btn-escanear-manual" type="button">
+                  <span id="icone-escanear-manual"></span> Escanear
+                </button>
+              </div>
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" for="manual-item-qty">Qtd. recebida</label>
@@ -988,8 +993,21 @@ Regras importantes:
 
     /* ---------- Init ---------- */
 
+    document.getElementById('btn-escanear-manual').addEventListener('click', () => {
+      abrirScannerQR((texto) => {
+        const item = getData().itens.find((i) => i.id === texto.trim());
+        if (!item) {
+          toast(`Nenhum item encontrado para o código "${texto}".`, 'error');
+          return;
+        }
+        document.getElementById('manual-item-select').value = item.id;
+        toast(`Item "${item.nome}" selecionado via QR Code.`, 'success');
+      });
+    });
+
     initTopbar('entradas');
     pintarIconesEstaticos();
+    document.getElementById('icone-escanear-manual').innerHTML = ICONS.camera;
     popularSessao();
     popularSelectItemManual();
     resetManualForm();

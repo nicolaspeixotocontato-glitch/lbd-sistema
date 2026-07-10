@@ -185,6 +185,7 @@ const PAGINA_PERMISSAO = {
   saidas: 'ver_saidas',
   transferencias: 'ver_transferencias',
   historico: 'ver_historico',
+  etiquetas: 'editar_estoque',
 };
 
 function checkPermissao(acao) {
@@ -436,6 +437,7 @@ const NAV_ITEMS = [
   { id: 'saidas', label: 'Saídas', href: 'saidas.html', icon: 'saidas', acao: 'ver_saidas' },
   { id: 'transferencias', label: 'Transferências', href: 'transferencias.html', icon: 'transfer', acao: 'ver_transferencias' },
   { id: 'historico', label: 'Histórico', href: 'historico.html', icon: 'historico', acao: 'ver_historico' },
+  { id: 'etiquetas', label: 'Etiquetas', href: 'etiquetas.html', icon: 'etiquetas', acao: 'editar_estoque' },
 ];
 
 function buildSidebar(paginaAtiva) {
@@ -567,6 +569,92 @@ function abrirSeletorLoja() {
 }
 
 /* ==========================================================================
+   7b. Scanner de QR Code (câmera)
+   ========================================================================== */
+
+let _scannerQRStream = null;
+let _scannerQRLoopId = null;
+let _scannerQRCallback = null;
+
+function fecharScannerQR() {
+  if (_scannerQRLoopId) cancelAnimationFrame(_scannerQRLoopId);
+  _scannerQRLoopId = null;
+  if (_scannerQRStream) {
+    _scannerQRStream.getTracks().forEach((t) => t.stop());
+    _scannerQRStream = null;
+  }
+  closeModal('modal-scanner-qr');
+}
+
+async function iniciarCameraScanner() {
+  const video = document.getElementById('scanner-qr-video');
+  const status = document.getElementById('scanner-qr-status');
+  status.textContent = 'Aponte a câmera para o QR Code do item.';
+
+  try {
+    _scannerQRStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = _scannerQRStream;
+    await video.play();
+
+    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    const loop = async () => {
+      if (!_scannerQRStream) return;
+      try {
+        const codigos = await detector.detect(video);
+        if (codigos.length > 0) {
+          const texto = codigos[0].rawValue;
+          const callback = _scannerQRCallback;
+          fecharScannerQR();
+          if (callback) callback(texto);
+          return;
+        }
+      } catch (e) {
+        // erro transitório de detecção — ignora e tenta no próximo quadro
+      }
+      _scannerQRLoopId = requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {
+    status.textContent = 'Não foi possível acessar a câmera. Verifique as permissões do navegador ou use a busca por nome abaixo.';
+  }
+}
+
+function abrirScannerQR(onDetectado) {
+  if (!('BarcodeDetector' in window)) {
+    toast('Seu navegador não suporta leitura de QR Code pela câmera. Use a busca por nome.', 'warning');
+    return;
+  }
+
+  let modal = document.getElementById('modal-scanner-qr');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-scanner-qr';
+    modal.className = 'modal-backdrop';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <span class="modal-title">Escanear item</span>
+          <button class="modal-close" type="button" aria-label="Fechar" onclick="fecharScannerQR()">${ICONS.close}</button>
+        </div>
+        <div class="modal-body flex flex-col gap-16">
+          <video id="scanner-qr-video" style="width:100%; border-radius:var(--radius); background:#000;" playsinline muted></video>
+          <div class="text-secondary" id="scanner-qr-status" style="font-size:var(--fs-12)"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) fecharScannerQR();
+    });
+  }
+
+  _scannerQRCallback = onDetectado;
+  openModal('modal-scanner-qr');
+  iniciarCameraScanner();
+}
+
+/* ==========================================================================
    8. Icons
    ========================================================================== */
 
@@ -589,4 +677,6 @@ const ICONS = {
   'arrow-up': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>',
   'arrow-down': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/></svg>',
+  etiquetas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3"/><path d="M14 21h.01"/><path d="M21 14v.01"/><path d="M21 21h-3"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>',
 };

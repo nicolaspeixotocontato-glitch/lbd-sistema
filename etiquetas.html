@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etiquetas — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    /* Ajuste aqui o tamanho físico da etiqueta (mm) — ainda não decidimos entre
+       impressora térmica de etiqueta ou folha adesiva comum. */
+    :root {
+      --etiqueta-largura: 40mm;
+      --etiqueta-altura: 30mm;
+    }
+
+    .chk-col { width: 40px; }
+
+    #print-etiquetas {
+      display: none;
+    }
+
+    .etiquetas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, var(--etiqueta-largura));
+      gap: 2mm;
+    }
+
+    .etiqueta {
+      width: var(--etiqueta-largura);
+      height: var(--etiqueta-altura);
+      border: 1px dashed #ccc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2mm;
+      box-sizing: border-box;
+      page-break-inside: avoid;
+    }
+
+    .etiqueta-qr svg {
+      width: 20mm;
+      height: 20mm;
+      display: block;
+    }
+
+    .etiqueta-nome {
+      font-size: 2.6mm;
+      font-weight: 600;
+      text-align: center;
+      color: #000;
+      margin-top: 1mm;
+      line-height: 1.2;
+    }
+
+    .etiqueta-id {
+      font-size: 2.2mm;
+      color: #555;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-etiquetas,
+      #print-etiquetas * {
+        visibility: visible;
+      }
+      #print-etiquetas {
+        display: grid;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+      @page {
+        margin: 5mm;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="mb-16">
+        <h1 class="page-title">Etiquetas</h1>
+        <p class="page-subtitle">Gere etiquetas com QR Code para os itens do estoque</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header flex items-center justify-between">
+          <span class="card-title">Itens do estoque</span>
+          <label class="flex items-center gap-8" style="font-size:var(--fs-13); cursor:pointer;">
+            <input type="checkbox" id="chk-selecionar-todos">
+            Selecionar todos
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="chk-col"></th>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>UN</th>
+              </tr>
+            </thead>
+            <tbody id="itens-etiquetas-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card-footer flex items-center justify-between">
+          <span class="text-secondary" id="footer-selecionados"></span>
+          <button class="btn btn-primary btn-md" id="btn-gerar-etiquetas" type="button">Gerar etiquetas para impressão</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="print-etiquetas" class="etiquetas-grid"></div>
+
+  <script src="assets/qrcode.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    function renderItensEtiquetas() {
+      const itens = getData().itens.filter((i) => i.ativo).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      document.getElementById('itens-etiquetas-tbody').innerHTML = itens.map((i) => `
+        <tr>
+          <td><input type="checkbox" class="chk-item-etiqueta" value="${i.id}"></td>
+          <td class="td-muted">${i.id}</td>
+          <td>${i.nome}</td>
+          <td class="td-muted">${i.cat}</td>
+          <td class="td-muted">${i.un}</td>
+        </tr>
+      `).join('');
+      atualizarContagemSelecionados();
+    }
+
+    function atualizarContagemSelecionados() {
+      const total = document.querySelectorAll('.chk-item-etiqueta:checked').length;
+      document.getElementById('footer-selecionados').textContent = `${total} ${total === 1 ? 'item selecionado' : 'itens selecionados'}`;
+    }
+
+    document.getElementById('itens-etiquetas-tbody').addEventListener('change', (e) => {
+      if (e.target.classList.contains('chk-item-etiqueta')) atualizarContagemSelecionados();
+    });
+
+    document.getElementById('chk-selecionar-todos').addEventListener('change', (e) => {
+      document.querySelectorAll('.chk-item-etiqueta').forEach((c) => { c.checked = e.target.checked; });
+      atualizarContagemSelecionados();
+    });
+
+    document.getElementById('btn-gerar-etiquetas').addEventListener('click', () => {
+      const ids = Array.from(document.querySelectorAll('.chk-item-etiqueta:checked')).map((c) => c.value);
+      if (ids.length === 0) {
+        toast('Selecione ao menos um item.', 'error');
+        return;
+      }
+
+      const data = getData();
+      const container = document.getElementById('print-etiquetas');
+      container.innerHTML = ids.map((id) => {
+        const item = data.itens.find((i) => i.id === id);
+        if (!item) return '';
+        return `
+          <div class="etiqueta">
+            <div class="etiqueta-qr">${QR.gerarSVG(item.id)}</div>
+            <div class="etiqueta-nome">${item.nome}</div>
+            <div class="etiqueta-id">${item.id}</div>
+          </div>
+        `;
+      }).join('');
+
+      window.print();
+    });
+
+    initTopbar('etiquetas');
+    renderItensEtiquetas();
+  </script>
+</body>
+</html>

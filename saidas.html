@@ -51,7 +51,12 @@
         <div class="card-body flex flex-col gap-16">
           <div class="form-group autocomplete-wrap" style="margin-bottom:0" id="busca-wrap">
             <label class="form-label" for="busca-item">Item</label>
-            <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off">
+            <div class="flex gap-8">
+              <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off" style="flex:1">
+              <button class="btn btn-secondary btn-md" id="btn-escanear" type="button">
+                <span id="icone-escanear"></span> Escanear item
+              </button>
+            </div>
             <div class="autocomplete-list" id="autocomplete-list" style="display:none"></div>
           </div>
           <div id="item-selecionado-wrap" style="display:none">
@@ -236,7 +241,19 @@
       `).join('');
     }
 
+    document.getElementById('btn-escanear').addEventListener('click', () => {
+      abrirScannerQR((texto) => {
+        const item = getData().itens.find((i) => i.id === texto.trim());
+        if (!item) {
+          toast(`Nenhum item encontrado para o código "${texto}".`, 'error');
+          return;
+        }
+        selecionarItem(item.id);
+      });
+    });
+
     initTopbar('saidas');
+    document.getElementById('icone-escanear').innerHTML = ICONS.camera;
     popularSessao();
     renderRetiradas();
   </script>
