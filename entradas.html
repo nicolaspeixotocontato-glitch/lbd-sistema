@@ -169,7 +169,7 @@
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" for="sessao-responsavel">Responsável</label>
-              <input class="form-input" type="text" id="sessao-responsavel" placeholder="Nome do responsável">
+              <input class="form-input" type="text" id="sessao-responsavel" readonly>
             </div>
           </div>
         </div>
@@ -385,7 +385,8 @@
     }
 
     function sessaoResponsavelAtual() {
-      return document.getElementById('sessao-responsavel').value.trim() || '—';
+      const usuario = getUsuarioAtivo();
+      return usuario ? usuario.nome : '—';
     }
 
     /* ---------- Upload / preview ---------- */

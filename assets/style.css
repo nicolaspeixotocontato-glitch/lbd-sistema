@@ -62,8 +62,8 @@
   --transition: 180ms ease;
 
   /* Z-index */
-  --z-sidebar: 100;
-  --z-overlay: 200;
+  --z-sidebar: 200;
+  --z-overlay: 100;
   --z-modal: 300;
   --z-toast: 400;
 }
@@ -876,6 +876,12 @@ table {
 .form-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.form-input[readonly] {
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: default;
 }
 
 .form-hint {

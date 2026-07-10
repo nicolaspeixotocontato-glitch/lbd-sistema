@@ -40,7 +40,7 @@
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" for="sessao-responsavel">Responsável</label>
-              <input class="form-input" type="text" id="sessao-responsavel" placeholder="Nome do responsável">
+              <input class="form-input" type="text" id="sessao-responsavel" readonly>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@
         <div class="table-wrap">
           <table class="table">
             <thead>
-              <tr><th>Hora</th><th>Item</th><th class="td-num">Qtd</th><th>Motivo</th><th>Loja</th></tr>
+              <tr><th>Hora</th><th>Item</th><th class="td-num">Qtd</th><th>Motivo</th><th>Loja</th><th>Responsável</th></tr>
             </thead>
             <tbody id="retiradas-tbody"></tbody>
           </table>
@@ -206,7 +206,7 @@
       const resultado = registrarMovimentacao('saida', loja, itemSelecionado.id, qty, motivo, usuario);
       if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
 
-      retiradasSessao.unshift({ ts: Date.now(), item: itemSelecionado.nome, un: itemSelecionado.un, qty, motivo, loja });
+      retiradasSessao.unshift({ ts: Date.now(), item: itemSelecionado.nome, un: itemSelecionado.un, qty, motivo, loja, responsavel: usuario ? usuario.nome : '—' });
       renderRetiradas();
       toast('Saída registrada com sucesso.', 'success');
 
@@ -221,7 +221,7 @@
     function renderRetiradas() {
       const tbody = document.getElementById('retiradas-tbody');
       if (retiradasSessao.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><span class="empty-state-icon">${ICONS.saidas}</span><div class="empty-state-title">Nenhuma saída registrada</div><div class="empty-state-subtitle">As retiradas desta sessão aparecerão aqui.</div></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="empty-state-icon">${ICONS.saidas}</span><div class="empty-state-title">Nenhuma saída registrada</div><div class="empty-state-subtitle">As retiradas desta sessão aparecerão aqui.</div></div></td></tr>`;
         return;
       }
       tbody.innerHTML = retiradasSessao.map((r) => `
@@ -231,6 +231,7 @@
           <td class="td-num">${fmt(r.qty)} ${r.un}</td>
           <td class="td-muted">${r.motivo}</td>
           <td class="td-muted">${r.loja}</td>
+          <td class="td-muted">${r.responsavel}</td>
         </tr>
       `).join('');
     }
