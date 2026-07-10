@@ -152,7 +152,7 @@
       <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap; gap:12px;">
         <div>
           <h1 class="page-title">Entradas</h1>
-          <p class="page-subtitle">Registre a entrada de mercadorias a partir do cupom fiscal</p>
+          <p class="page-subtitle">Registre a entrada de mercadorias via cupom fiscal ou nota manual</p>
         </div>
       </div>
 
@@ -173,6 +173,11 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="loja-tabs mb-16" id="modo-tabs">
+        <button type="button" class="loja-tab is-active" id="tab-cupom-ia">Cupom por foto (IA)</button>
+        <button type="button" class="loja-tab" id="tab-nota-manual">Nota manual</button>
       </div>
 
       <div class="card mb-16" id="upload-card">
@@ -196,9 +201,53 @@
         </div>
       </div>
 
+      <div class="card mb-16" id="manual-card" style="display:none">
+        <div class="card-header"><span class="card-title">Nota manual</span></div>
+        <div class="card-body flex flex-col gap-16">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="manual-fornecedor">Fornecedor</label>
+              <input class="form-input" type="text" id="manual-fornecedor" placeholder="Nome do fornecedor">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="manual-data">Data</label>
+              <input class="form-input" type="date" id="manual-data">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="manual-nf">NF (opcional)</label>
+            <input class="form-input" type="text" id="manual-nf" placeholder="Número da nota fiscal">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="manual-item-select">Item</label>
+              <select class="form-select" id="manual-item-select"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="manual-item-qty">Qtd. recebida</label>
+              <input class="form-input" type="number" id="manual-item-qty" min="0" step="0.01" value="1">
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-md" id="btn-adicionar-item-manual" type="button">Adicionar item</button>
+
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Item</th><th>UN</th><th class="td-num">Qtd</th><th>Ações</th></tr>
+              </thead>
+              <tbody id="manual-itens-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary btn-md" id="btn-revisar-manual" type="button">Revisar nota</button>
+        </div>
+      </div>
+
       <div class="card mb-16" id="resultado-card" style="display:none">
         <div class="card-header">
-          <span class="card-title">Resultado da extração</span>
+          <span class="card-title" id="resultado-card-title">Resultado da extração</span>
         </div>
         <div class="card-body flex flex-col gap-16">
           <div class="resumo-grid" id="resumo-nota"></div>
@@ -308,6 +357,7 @@
     let arquivoAtual = null;
     let resultadoExtracao = null;
     let notasSessao = [];
+    let manualItens = [];
 
     function getApiKey() {
       return localStorage.getItem(API_KEY_STORAGE) || '';
@@ -387,6 +437,104 @@
     function sessaoResponsavelAtual() {
       const usuario = getUsuarioAtivo();
       return usuario ? usuario.nome : '—';
+    }
+
+    /* ---------- Modo de entrada (cupom IA x nota manual) ---------- */
+
+    function setModoEntrada(modo) {
+      const isManual = modo === 'manual';
+      document.getElementById('tab-cupom-ia').classList.toggle('is-active', !isManual);
+      document.getElementById('tab-nota-manual').classList.toggle('is-active', isManual);
+      document.getElementById('upload-card').style.display = isManual ? 'none' : '';
+      document.getElementById('manual-card').style.display = isManual ? '' : 'none';
+      document.getElementById('resultado-card').style.display = 'none';
+    }
+
+    document.getElementById('tab-cupom-ia').addEventListener('click', () => setModoEntrada('cupom'));
+    document.getElementById('tab-nota-manual').addEventListener('click', () => setModoEntrada('manual'));
+
+    function popularSelectItemManual() {
+      const select = document.getElementById('manual-item-select');
+      const itens = getData().itens.filter((i) => i.ativo).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      select.innerHTML = itens.map((i) => `<option value="${i.id}">${i.nome} (${i.un})</option>`).join('');
+    }
+
+    function renderManualItens() {
+      const tbody = document.getElementById('manual-itens-tbody');
+      if (manualItens.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4">
+              <div class="empty-state">
+                <span class="empty-state-icon">${ICONS.entradas}</span>
+                <div class="empty-state-title">Nenhum item adicionado</div>
+                <div class="empty-state-subtitle">Selecione um item e a quantidade recebida acima.</div>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      tbody.innerHTML = manualItens.map((it, idx) => `
+        <tr>
+          <td>${it.item}</td>
+          <td class="td-muted">${it.un}</td>
+          <td class="td-num">${fmt(it.qtd_recebida)}</td>
+          <td><button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remover ${it.item}" onclick="removerItemManual(${idx})">${ICONS.trash}</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function removerItemManual(idx) {
+      manualItens.splice(idx, 1);
+      renderManualItens();
+    }
+
+    document.getElementById('btn-adicionar-item-manual').addEventListener('click', () => {
+      const itemId = document.getElementById('manual-item-select').value;
+      const qty = Number(document.getElementById('manual-item-qty').value) || 0;
+
+      if (!itemId) { toast('Selecione um item.', 'error'); return; }
+      if (qty <= 0) { toast('Informe uma quantidade maior que zero.', 'error'); return; }
+
+      const item = getData().itens.find((i) => i.id === itemId);
+      if (!item) return;
+
+      manualItens.push({ item: item.nome, un: item.un, qtd_recebida: qty, precoUnit: item.precoUnit });
+      renderManualItens();
+      document.getElementById('manual-item-qty').value = 1;
+    });
+
+    document.getElementById('btn-revisar-manual').addEventListener('click', () => {
+      const fornecedor = document.getElementById('manual-fornecedor').value.trim();
+      const dataInput = document.getElementById('manual-data').value;
+      const nf = document.getElementById('manual-nf').value.trim();
+
+      if (!fornecedor) { toast('Informe o fornecedor.', 'error'); return; }
+      if (manualItens.length === 0) { toast('Adicione ao menos um item.', 'error'); return; }
+
+      const [ano, mes, dia] = dataInput ? dataInput.split('-') : [];
+      const total = manualItens.reduce((acc, it) => acc + it.qtd_recebida * (it.precoUnit || 0), 0);
+
+      resultadoExtracao = {
+        fornecedor,
+        data: dataInput ? `${dia}/${mes}/${ano}` : null,
+        nf: nf || null,
+        total,
+        itens: manualItens.map((it) => ({ item: it.item, un: it.un, qtd_recebida: it.qtd_recebida })),
+      };
+
+      document.getElementById('resultado-card-title').textContent = 'Itens da nota manual';
+      renderResultado();
+      toast('Nota pronta para revisão abaixo.', 'success');
+    });
+
+    function resetManualForm() {
+      manualItens = [];
+      document.getElementById('manual-fornecedor').value = '';
+      document.getElementById('manual-nf').value = '';
+      document.getElementById('manual-data').value = new Date().toISOString().slice(0, 10);
+      renderManualItens();
     }
 
     /* ---------- Upload / preview ---------- */
@@ -583,6 +731,7 @@ Regras importantes:
 
       try {
         resultadoExtracao = await chamarAnthropicExtrairCupom();
+        document.getElementById('resultado-card-title').textContent = 'Resultado da extração';
         renderResultado();
         toast('Dados extraídos com sucesso.', 'success');
       } catch (e) {
@@ -650,6 +799,7 @@ Regras importantes:
       notasSessao.unshift(nota);
       renderNotasSessao();
       removerArquivo();
+      resetManualForm();
     }
 
     document.getElementById('btn-so-planilha').addEventListener('click', () => {
@@ -841,6 +991,8 @@ Regras importantes:
     initTopbar('entradas');
     pintarIconesEstaticos();
     popularSessao();
+    popularSelectItemManual();
+    resetManualForm();
     renderApiKeyStatus();
     renderNotasSessao();
 
