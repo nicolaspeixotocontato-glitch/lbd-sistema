@@ -110,7 +110,10 @@
     }
 
     function renderLojaTabs() {
-      const opcoes = [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))];
+      const permitidas = lojasPermitidas();
+      const opcoes = permitidas.length === LOJAS.length
+        ? [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))]
+        : permitidas.map((l) => ({ id: l.id, label: l.id }));
       document.getElementById('loja-tabs').innerHTML = opcoes.map((o) => `
         <button type="button" class="loja-tab${o.id === filtroLoja ? ' is-active' : ''}" onclick="setFiltroLoja('${o.id}')">${o.label}</button>
       `).join('');
@@ -339,6 +342,10 @@
     }
 
     initTopbar('painel');
+    if (!checkPermissao('ver_outras_lojas')) {
+      const usuario = getUsuarioAtivo();
+      if (usuario) filtroLoja = usuario.loja;
+    }
     renderAll();
   </script>
 </body>

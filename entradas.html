@@ -366,11 +366,18 @@
 
     function popularSessao() {
       const select = document.getElementById('sessao-loja');
-      select.innerHTML = LOJAS.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
-      select.value = getLojaAtiva();
+      const permitidas = lojasPermitidas();
+      select.innerHTML = permitidas.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
 
       const usuario = getUsuarioAtivo();
+      select.value = permitidas.length === LOJAS.length ? getLojaAtiva() : usuario.loja;
+      select.disabled = permitidas.length === 1;
+
       document.getElementById('sessao-responsavel').value = usuario ? usuario.nome : '';
+
+      if (!checkPermissao('exportar_dados')) {
+        document.getElementById('btn-exportar-xlsx').style.display = 'none';
+      }
     }
 
     function sessaoLojaAtual() {
@@ -754,6 +761,7 @@ Regras importantes:
     /* ---------- Exportação e nova sessão ---------- */
 
     document.getElementById('btn-exportar-xlsx').addEventListener('click', () => {
+      if (!checkPermissao('exportar_dados')) { toast('Você não tem permissão para exportar dados.', 'error'); return; }
       if (notasSessao.length === 0) {
         toast('Nenhuma nota para exportar.', 'error');
         return;

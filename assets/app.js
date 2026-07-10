@@ -170,6 +170,49 @@ function logout() {
 }
 
 /* ==========================================================================
+   4b. Permissões
+   ========================================================================== */
+
+const PERMISSOES_POR_PERFIL = {
+  gerente: ['ver_painel', 'ver_estoque', 'ver_entradas', 'ver_saidas', 'ver_transferencias', 'ver_historico'],
+  operador: ['ver_saidas'],
+};
+
+const PAGINA_PERMISSAO = {
+  painel: 'ver_painel',
+  estoque: 'ver_estoque',
+  entradas: 'ver_entradas',
+  saidas: 'ver_saidas',
+  transferencias: 'ver_transferencias',
+  historico: 'ver_historico',
+};
+
+function checkPermissao(acao) {
+  const usuario = getUsuarioAtivo();
+  if (!usuario) return false;
+  if (usuario.perfil === 'admin') return true;
+  const permitidas = PERMISSOES_POR_PERFIL[usuario.perfil] || [];
+  return permitidas.includes(acao);
+}
+
+function lojasPermitidas() {
+  const usuario = getUsuarioAtivo();
+  if (!usuario || checkPermissao('ver_outras_lojas')) return LOJAS;
+  return LOJAS.filter((l) => l.id === usuario.loja);
+}
+
+function verificarAcessoPagina(pagina) {
+  const acao = PAGINA_PERMISSAO[pagina];
+  if (!acao || checkPermissao(acao)) return true;
+
+  const usuario = getUsuarioAtivo();
+  const destino = usuario && usuario.perfil === 'operador' ? 'saidas.html' : 'painel.html';
+  const atual = window.location.pathname.split('/').pop();
+  if (atual !== destino) window.location.href = destino;
+  return false;
+}
+
+/* ==========================================================================
    5. Estoque
    ========================================================================== */
 
@@ -387,19 +430,19 @@ function initSidebarMobile() {
 }
 
 const NAV_ITEMS = [
-  { id: 'painel', label: 'Painel', href: 'painel.html', icon: 'dashboard' },
-  { id: 'estoque', label: 'Estoque', href: 'estoque.html', icon: 'estoque' },
-  { id: 'entradas', label: 'Entradas', href: 'entradas.html', icon: 'entradas' },
-  { id: 'saidas', label: 'Saídas', href: 'saidas.html', icon: 'saidas' },
-  { id: 'transferencias', label: 'Transferências', href: 'transferencias.html', icon: 'transfer' },
-  { id: 'historico', label: 'Histórico', href: 'historico.html', icon: 'historico' },
+  { id: 'painel', label: 'Painel', href: 'painel.html', icon: 'dashboard', acao: 'ver_painel' },
+  { id: 'estoque', label: 'Estoque', href: 'estoque.html', icon: 'estoque', acao: 'ver_estoque' },
+  { id: 'entradas', label: 'Entradas', href: 'entradas.html', icon: 'entradas', acao: 'ver_entradas' },
+  { id: 'saidas', label: 'Saídas', href: 'saidas.html', icon: 'saidas', acao: 'ver_saidas' },
+  { id: 'transferencias', label: 'Transferências', href: 'transferencias.html', icon: 'transfer', acao: 'ver_transferencias' },
+  { id: 'historico', label: 'Histórico', href: 'historico.html', icon: 'historico', acao: 'ver_historico' },
 ];
 
 function buildSidebar(paginaAtiva) {
   const lojaId = getLojaAtiva();
   const alertas = getItensAbaixoMinimo(lojaId).length;
 
-  const navHtml = NAV_ITEMS.map((n) => {
+  const navHtml = NAV_ITEMS.filter((n) => checkPermissao(n.acao)).map((n) => {
     const ativo = n.id === paginaAtiva ? ' is-active' : '';
     const badge = n.id === 'estoque' && alertas > 0
       ? `<span class="nav-badge">${alertas}</span>`
@@ -453,6 +496,7 @@ function buildTopbar() {
 function initTopbar(paginaAtiva) {
   const session = requireAuth();
   if (!session) return;
+  if (!verificarAcessoPagina(paginaAtiva)) return;
 
   const sidebarMount = document.getElementById('sidebar-mount');
   const topbarMount = document.getElementById('topbar-mount');

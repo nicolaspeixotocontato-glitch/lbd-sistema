@@ -88,7 +88,10 @@
     };
 
     function renderLojaTabs() {
-      const opcoes = [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))];
+      const permitidas = lojasPermitidas();
+      const opcoes = permitidas.length === LOJAS.length
+        ? [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))]
+        : permitidas.map((l) => ({ id: l.id, label: l.id }));
       document.getElementById('loja-tabs').innerHTML = opcoes.map((o) => `
         <button type="button" class="loja-tab${o.id === filtroLoja ? ' is-active' : ''}" onclick="setFiltro('loja','${o.id}')">${o.label}</button>
       `).join('');
@@ -191,6 +194,7 @@
     });
 
     document.getElementById('btn-exportar-csv').addEventListener('click', () => {
+      if (!checkPermissao('exportar_dados')) { toast('Você não tem permissão para exportar dados.', 'error'); return; }
       const data = getData();
       const registros = getRegistrosFiltrados();
       if (registros.length === 0) { toast('Nenhum registro para exportar.', 'error'); return; }
@@ -218,6 +222,13 @@
     });
 
     initTopbar('historico');
+    if (!checkPermissao('ver_outras_lojas')) {
+      const usuario = getUsuarioAtivo();
+      if (usuario) filtroLoja = usuario.loja;
+    }
+    if (!checkPermissao('exportar_dados')) {
+      document.getElementById('btn-exportar-csv').style.display = 'none';
+    }
     document.getElementById('search-icon').innerHTML = ICONS.search;
     renderAll();
   </script>

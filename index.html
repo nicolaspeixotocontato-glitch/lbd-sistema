@@ -122,8 +122,6 @@
         <div class="login-error" id="login-error" role="alert"></div>
 
         <button class="btn btn-primary btn-md btn-full" type="submit">Entrar</button>
-
-        <div class="login-hint">Fase de testes: senha = seu nome em minúsculas</div>
       </div>
     </form>
 
@@ -134,7 +132,8 @@
   <script>
     (function () {
       if (getSession()) {
-        window.location.href = 'painel.html';
+        const usuarioAtivo = getUsuarioAtivo();
+        window.location.href = usuarioAtivo && usuarioAtivo.perfil === 'operador' ? 'saidas.html' : 'painel.html';
         return;
       }
 
@@ -159,7 +158,7 @@
           return;
         }
 
-        window.location.href = 'painel.html';
+        window.location.href = resultado.usuario.perfil === 'operador' ? 'saidas.html' : 'painel.html';
       });
     })();
   </script>

@@ -66,7 +66,7 @@
       <div class="card">
         <div class="card-header flex items-center justify-between">
           <span class="card-title">Itens em estoque</span>
-          <button class="btn btn-secondary btn-sm" type="button" onclick="exportarCSV()">Exportar CSV</button>
+          <button class="btn btn-secondary btn-sm" type="button" id="btn-exportar-csv" onclick="exportarCSV()">Exportar CSV</button>
         </div>
         <div class="table-wrap">
           <table class="table">
@@ -232,7 +232,10 @@
     }
 
     function renderLojaTabs() {
-      const opcoes = [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))];
+      const permitidas = lojasPermitidas();
+      const opcoes = permitidas.length === LOJAS.length
+        ? [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))]
+        : permitidas.map((l) => ({ id: l.id, label: l.id }));
       document.getElementById('loja-tabs').innerHTML = opcoes.map((o) => `
         <button type="button" class="loja-tab${o.id === filtroLoja ? ' is-active' : ''}" onclick="setFiltroLoja('${o.id}')">${o.label}</button>
       `).join('');
@@ -326,7 +329,7 @@
               <td class="td-num">${fmtR(l.item.precoUnit)}</td>
               <td class="td-num">${fmtR(valorTotal)}</td>
               <td>
-                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Editar ${l.item.nome}" onclick="abrirEditar('${l.item.id}')">${ICONS.edit}</button>
+                ${checkPermissao('editar_estoque') ? `<button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Editar ${l.item.nome}" onclick="abrirEditar('${l.item.id}')">${ICONS.edit}</button>` : '<span class="td-muted">—</span>'}
               </td>
             </tr>
           `;
@@ -351,14 +354,29 @@
       document.getElementById('close-novo-item').innerHTML = ICONS.close;
       document.getElementById('close-editar-item').innerHTML = ICONS.close;
       document.getElementById('btn-novo-item').innerHTML = `${ICONS.plus} Novo item`;
+
+      if (!checkPermissao('editar_estoque')) {
+        document.getElementById('btn-novo-item').style.display = 'none';
+      }
+      if (!checkPermissao('exportar_dados')) {
+        document.getElementById('btn-exportar-csv').style.display = 'none';
+      }
     }
 
     function abrirNovoItem() {
+      if (!checkPermissao('editar_estoque')) {
+        toast('Você não tem permissão para cadastrar itens.', 'error');
+        return;
+      }
       document.getElementById('form-novo-item').reset();
       openModal('modal-novo-item');
     }
 
     function abrirEditar(itemId) {
+      if (!checkPermissao('editar_estoque')) {
+        toast('Você não tem permissão para editar itens.', 'error');
+        return;
+      }
       const data = getData();
       const item = data.itens.find((i) => i.id === itemId);
       if (!item) return;
@@ -383,6 +401,7 @@
 
     document.getElementById('form-novo-item').addEventListener('submit', (e) => {
       e.preventDefault();
+      if (!checkPermissao('editar_estoque')) return;
       const nome = document.getElementById('novo-nome').value.trim();
       const cat = document.getElementById('novo-categoria').value;
       const un = document.getElementById('novo-unidade').value.trim();
@@ -406,7 +425,7 @@
 
     document.getElementById('form-editar-item').addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!itemEditandoId) return;
+      if (!checkPermissao('editar_estoque') || !itemEditandoId) return;
 
       const nome = document.getElementById('editar-nome').value.trim();
       const cat = document.getElementById('editar-categoria').value;
@@ -432,6 +451,10 @@
     });
 
     function exportarCSV() {
+      if (!checkPermissao('exportar_dados')) {
+        toast('Você não tem permissão para exportar dados.', 'error');
+        return;
+      }
       const linhas = getItensFiltrados();
       const header = ['ID', 'Nome', 'Categoria', 'UN', 'Estoque atual', 'Mínimo', 'Status', 'Preço unit.', 'Valor total'];
       const rows = linhas.map((l) => [
@@ -462,6 +485,10 @@
     }
 
     initTopbar('estoque');
+    if (!checkPermissao('ver_outras_lojas')) {
+      const usuario = getUsuarioAtivo();
+      if (usuario) filtroLoja = usuario.loja;
+    }
     popularSelectsCategoria();
     pintarIconesEstaticos();
     renderAll();

@@ -97,15 +97,18 @@
     let itemSelecionado = null;
 
     function popularForm() {
-      const opts = LOJAS.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
       const origem = document.getElementById('loja-origem');
       const destino = document.getElementById('loja-destino');
-      origem.innerHTML = opts;
-      destino.innerHTML = opts;
-      origem.value = getLojaAtiva();
+      const permitidasOrigem = lojasPermitidas();
+      const usuario = getUsuarioAtivo();
+
+      origem.innerHTML = permitidasOrigem.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+      destino.innerHTML = LOJAS.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+
+      origem.value = permitidasOrigem.length === LOJAS.length ? getLojaAtiva() : usuario.loja;
+      origem.disabled = permitidasOrigem.length === 1;
       destino.value = LOJAS.find((l) => l.id !== origem.value)?.id || LOJAS[0].id;
 
-      const usuario = getUsuarioAtivo();
       document.getElementById('responsavel-input').value = usuario ? usuario.nome : '';
     }
 

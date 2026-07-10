@@ -103,9 +103,11 @@
 
     function popularSessao() {
       const select = document.getElementById('sessao-loja');
-      select.innerHTML = LOJAS.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
-      select.value = getLojaAtiva();
+      const permitidas = lojasPermitidas();
+      select.innerHTML = permitidas.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
       const usuario = getUsuarioAtivo();
+      select.value = permitidas.length === LOJAS.length ? getLojaAtiva() : usuario.loja;
+      select.disabled = permitidas.length === 1;
       document.getElementById('sessao-responsavel').value = usuario ? usuario.nome : '';
 
       const motivoSelect = document.getElementById('motivo-select');
