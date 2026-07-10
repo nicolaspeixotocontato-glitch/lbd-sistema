@@ -1,8 +1,73 @@
 # CHANGELOG.md — La Bella Donna ERP (lbd-sistema)
 
-> Histórico de mudanças relevantes do projeto, em ordem cronológica reversa (mais recente
-> primeiro). Formato livre inspirado em [Keep a Changelog](https://keepachangelog.com/).
-> Ver `docs/PROJECT_CONTEXT.md` para o estado atual completo do sistema.
+> Histórico de mudanças do projeto. Ver `docs/PROJECT_CONTEXT.md` para o estado atual
+> completo do sistema (arquitetura, dados, regras de negócio, débitos técnicos e bugs
+> conhecidos) — este arquivo é um complemento histórico, não o substitui.
+
+---
+
+## Histórico resumido (a partir de `git log --oneline`, da mais antiga para a mais nova)
+
+- `f6aeffe` — feat: MVP completo - saidas, transferencias, historico
+- `faa1e72` — fix: stat cards em linha única no desktop
+- `d359a43` — feat: permissões por perfil e remoção da dica de senha
+- `292c3ca` — fix: corrige menu mobile e integridade do campo Responsável
+- `72ebac7` — feat: entrada manual de nota como alternativa ao cupom por IA
+- `6cd2ec1` — feat: sistema de QR Code para itens (geração de etiquetas e leitura via câmera)
+- `55070e8` — Trocar leitura de QR Code por jsQR (compatível com todos navegadores)
+- `703bef3` — Bloquear item duplicado e permitir exclusao (soft delete) no Estoque
+- `e54b0ae` — Adicionar aba Pedidos com lista de compras por loja e por fornecedor
+- `90fe0fc` — Corrigir migracao de fornecedores para dados ja salvos no navegador
+- `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
+
+Detalhamento das duas sprints mais recentes abaixo.
+
+---
+
+## 2026-07-10 — Sprint de Pedidos (revisada e validada)
+
+**Objetivo da sprint:** dar visibilidade a itens abaixo do mínimo em forma de lista de
+compras, organizada tanto por loja quanto por fornecedor, com um indicador simples de se
+o preço mais recente pago por cada item está bom, médio ou caro.
+
+### Adicionado
+
+- **Nova página `pedidos.html`**, com duas visões:
+  - **Por loja**: para cada loja permitida ao usuário (`lojasPermitidas()`), lista os
+    itens abaixo do mínimo (reaproveitando `getItensAbaixoMinimo()`), com estoque atual,
+    mínimo e quantidade sugerida para repor.
+  - **Por fornecedor**: agrupa os mesmos itens por `fornecedorId`, somando quantidades
+    quando o mesmo item aparece em mais de uma loja, e mostra o valor total estimado do
+    pedido por fornecedor.
+- **`FORNECEDORES`** em `assets/app.js`: 8 fornecedores fictícios (`tipo: 'fornecedor'`
+  ou `'atacado'`), e o campo `fornecedorId` adicionado a cada item de `DADOS_INICIAIS`.
+- **`HISTORICO_PRECOS`** (mock determinístico): para cada item, 3 registros de preço
+  pago gerados a partir de uma seed derivada do próprio id do item (`_seedFromId`) —
+  variação de até ±15% sobre o `precoUnit`, sem aleatoriedade real (mesmo resultado a
+  cada carregamento).
+- **Indicador de tendência de preço** (`getIndicadorPreco`): compara o preço mais
+  recente com a média dos anteriores — mais de 5% acima da média mostra "Pagando caro"
+  (vermelho), dentro de ±5% mostra "Preço médio" (amarelo), mais de 5% abaixo mostra
+  "Preço bom" (verde).
+- Nova permissão `ver_pedidos`, liberada para `admin` e `gerente` (não para `operador`),
+  e entrada correspondente em `NAV_ITEMS` (menu lateral).
+
+### Corrigido
+
+- **Bug de migração de dados**: `getData()` só populava `data.fornecedores` e o campo
+  `fornecedorId` de cada item quando os dados eram criados do zero (primeiro acesso) —
+  usuários que já tinham dados salvos no navegador antes desta feature ficavam sem esses
+  campos, e `pedidos.html` mostrava "Nenhum pedido necessário" mesmo com itens abaixo do
+  mínimo. `getData()` agora roda uma migração toda vez que carrega dados existentes:
+  preenche `data.fornecedores` se estiver ausente/vazio, e recupera o `fornecedorId` de
+  cada item a partir de `DADOS_INICIAIS` quando estiver faltando, salvando o resultado de
+  volta caso algo tenha sido corrigido.
+
+### Verificação
+
+Revisada e validada end-to-end: fornecedores, histórico de preços fictício, indicador de
+tendência colorido, permissões por perfil e a migração de dados antigos — sem bugs
+pendentes.
 
 ---
 
@@ -24,12 +89,14 @@ alterar regra de negócio, estrutura de dados, LocalStorage ou arquitetura.
     genérica para listas de autocomplete: `↑`/`↓` percorre as sugestões, `Enter` escolhe a
     sugestão destacada (ou a primeira, se nenhuma foi destacada ainda), `Esc` fecha a
     lista.
+  - `getFiltroLojaPadrao()` (seção 4b — Permissões) — retorna `'todas'` ou a loja do
+    usuário, conforme `ver_outras_lojas`; compartilhada por Estoque e Histórico.
   - Novo componente visual `.input-clear-btn` em `assets/style.css` (botão "×" circular
-    dentro de um campo de texto).
+    dentro de um campo de texto), e nova seção "Autocomplete" com os estilos de
+    `.autocomplete-wrap`/`.autocomplete-list`/`.autocomplete-item`/`.item-selecionado`
+    (antes duplicados nos `<style>` locais de Saídas e Transferências).
 - **Botão "Limpar filtros"** em `estoque.html` e `historico.html` — reseta loja
   (respeitando `lojasPermitidas()`), categoria/tipo, status/período e busca em um clique.
-  Nova função `getFiltroLojaPadrao()` em ambas as páginas, usada tanto no botão quanto na
-  inicialização (substituindo a lógica que antes só rodava uma vez no load).
 - **Botão de limpar busca ("×")** em `estoque.html`, `historico.html`, `saidas.html` e
   `transferencias.html`.
 - **Navegação completa por teclado no autocomplete de item** (`↑`/`↓`/`Enter`/`Esc`) em
@@ -50,7 +117,6 @@ alterar regra de negócio, estrutura de dados, LocalStorage ou arquitetura.
 - **Botão "Limpar formulário"** em `saidas.html`, `transferencias.html` e `entradas.html`
   (nota manual) — reinicia o lançamento em andamento sem precisar recarregar a página.
   Em Entradas, reaproveita a função já existente `resetManualForm()`.
-- `docs/CHANGELOG.md` (este arquivo).
 
 ### Alterado
 
@@ -62,8 +128,6 @@ alterar regra de negócio, estrutura de dados, LocalStorage ou arquitetura.
   (ex.: "Consumo em produção" durante o horário de pico). *Este é o único ponto desta
   sprint que muda um comportamento visível por padrão; não altera nenhuma regra de
   negócio, apenas o que fica preenchido na tela.*
-- `docs/PROJECT_CONTEXT.md` atualizado (seções 5.1, 6 e 9) para refletir os novos
-  utilitários e comportamentos.
 
 ### Não incluído nesta sprint (avaliado e adiado deliberadamente)
 
@@ -72,35 +136,26 @@ alterar regra de negócio, estrutura de dados, LocalStorage ou arquitetura.
   com o item escolhido). Não implementada agora por ter escopo e complexidade maiores que
   o restante desta sprint.
 
+### Revisão pós-implementação (antes do commit final)
+
+Uma revisão de código encontrou e corrigiu 3 problemas antes do commit:
+
+1. **Bug**: em `initAutocompleteTeclado`, a tecla `Esc` não fechava a lista de
+   autocomplete quando ela mostrava apenas "Nenhum item encontrado" (o `return`
+   antecipado por lista vazia acontecia antes da checagem da tecla `Esc`). Corrigido
+   reordenando a checagem — `Esc` agora funciona independentemente de haver resultados.
+2. **Duplicação**: função `getFiltroLojaPadrao()` estava copiada, idêntica, em
+   `estoque.html` e `historico.html`. Extraída para `assets/app.js`.
+3. **Duplicação**: bloco CSS de autocomplete (`.autocomplete-wrap`,
+   `.autocomplete-list`, `.autocomplete-item`, `.item-selecionado`) estava duplicado,
+   idêntico, entre `saidas.html` e `transferencias.html`. Centralizado em
+   `assets/style.css`.
+
 ### Verificação
 
-Todos os itens foram testados manualmente em um servidor local (login como admin,
-gerente e operador), cobrindo: autocomplete + navegação por teclado, Enter para
-confirmar/destacar campo pendente, botões de limpar busca/filtros/formulário, atalhos do
-Painel filtrados por permissão, e regressão nas páginas não alteradas (Pedidos,
-Etiquetas) e no fluxo restrito do operador (Saídas). Nenhum erro de console encontrado.
-
----
-
-## Antes deste changelog
-
-As mudanças abaixo aconteceram antes da criação deste arquivo; resumidas a partir do
-histórico do Git (`git log`) para dar contexto de evolução do projeto:
-
-| Commit | Resumo |
-|---|---|
-| `90fe0fc` | Corrige migração de fornecedores para dados já salvos no navegador (usuários antigos sem `fornecedorId`/`data.fornecedores`) |
-| `e54b0ae` | Adiciona a aba **Pedidos**: lista de compras por loja e por fornecedor, com indicador de tendência de preço |
-| `703bef3` | Estoque: bloqueia item duplicado (mesmo nome) e permite excluir item (soft delete `ativo:false`) |
-| `55070e8` | Troca a leitura de QR Code para `jsQR` (funciona em qualquer navegador, substituindo o `BarcodeDetector` nativo que só rodava no Chrome Android) |
-| `6cd2ec1` | Sistema de QR Code para itens: geração de etiquetas para impressão e leitura via câmera |
-| `72ebac7` | Entradas: adiciona lançamento manual de nota como alternativa à extração por IA |
-| `292c3ca` | Corrige menu mobile (z-index do overlay) e trava o campo Responsável ao usuário logado |
-| `d359a43` | Introduz permissões por perfil (admin/gerente/operador) e remove dica de senha na tela de login |
-| `faa1e72` | Ajusta stat cards para ficarem em linha única no desktop |
-| `f6aeffe` | MVP inicial: Saídas, Transferências e Histórico |
-
-Para o estado atual completo do sistema (arquitetura, dados, regras de negócio,
-funcionalidades, débitos técnicos e bugs conhecidos), consulte sempre
-`docs/PROJECT_CONTEXT.md` — este changelog é um complemento histórico, não substitui
-aquele documento.
+Testado manualmente em servidor local (login como admin, gerente e operador), cobrindo:
+autocomplete + navegação por teclado (incluindo o cenário do bug do Esc, após a correção),
+Enter para confirmar/destacar campo pendente, botões de limpar busca/filtros/formulário,
+atalhos do Painel filtrados por permissão, e regressão nas páginas não alteradas
+(Pedidos, Etiquetas) e no fluxo restrito do operador (Saídas). Nenhum erro de console
+encontrado, antes ou depois da revisão.

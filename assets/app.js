@@ -283,6 +283,12 @@ function lojasPermitidas() {
   return LOJAS.filter((l) => l.id === usuario.loja);
 }
 
+function getFiltroLojaPadrao() {
+  if (checkPermissao('ver_outras_lojas')) return 'todas';
+  const usuario = getUsuarioAtivo();
+  return usuario ? usuario.loja : 'todas';
+}
+
 function verificarAcessoPagina(pagina) {
   const acao = PAGINA_PERMISSAO[pagina];
   if (!acao || checkPermissao(acao)) return true;
@@ -550,6 +556,14 @@ function initAutocompleteTeclado(inputEl, listaEl, onSelecionar) {
 
   inputEl.addEventListener('keydown', (e) => {
     if (listaEl.style.display === 'none') return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      listaEl.style.display = 'none';
+      indiceAtivo = -1;
+      return;
+    }
+
     const itens = getItens();
     if (itens.length === 0) return;
 
@@ -568,10 +582,6 @@ function initAutocompleteTeclado(inputEl, listaEl, onSelecionar) {
         indiceAtivo = -1;
         onSelecionar(itens[alvo].dataset.id);
       }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      listaEl.style.display = 'none';
-      indiceAtivo = -1;
     }
   });
 }

@@ -8,8 +8,11 @@
 
 ## 1. Objetivo do sistema
 
-Sistema de gestão de estoque (mini-ERP) para a rede de pizzarias **La Bella Donna**, em
-Porto Alegre. Controla o estoque de insumos em múltiplas lojas, permitindo:
+Sistema de gestão de estoque (mini-ERP) para a franquia de pizzarias **La Bella Donna**,
+em Porto Alegre — hoje com **2 lojas em operação** (`LBD01` Cristóvão, `LBD02` Zona Sul)
+**e 1 loja abrindo** (`LBD03` "Nova Loja", já cadastrada no sistema mas ainda sem
+gerente/operador dedicado — ver seção 8.1). Controla o estoque de insumos entre essas
+lojas, permitindo:
 
 - Registrar **entradas** de mercadoria (via cupom fiscal fotografado + IA, ou lançamento manual).
 - Registrar **saídas** (consumo, perda, quebra, uso interno etc.).
@@ -132,7 +135,7 @@ estrutura "flat" típica de projeto estático simples.
 
 ## 5. Módulos existentes
 
-### 5.1 `assets/app.js` (núcleo — 865 linhas), organizado em seções comentadas:
+### 5.1 `assets/app.js` (núcleo — 875 linhas), organizado em seções comentadas:
 
 | # | Seção | Conteúdo |
 |---|---|---|
@@ -141,7 +144,7 @@ estrutura "flat" típica de projeto estático simples.
 | 2b | Histórico de preços (mock) | `_seedFromId`, `gerarHistoricoPrecos`, `HISTORICO_PRECOS` |
 | 3 | Storage | `getData`/`saveData` (com migração), `getSession`/`saveSession`/`clearSession` |
 | 4 | Auth | `login`, `requireAuth`, `getUsuarioAtivo`, `logout` |
-| 4b | Permissões | `PERMISSOES_POR_PERFIL`, `PAGINA_PERMISSAO`, `checkPermissao`, `lojasPermitidas`, `verificarAcessoPagina` |
+| 4b | Permissões | `PERMISSOES_POR_PERFIL`, `PAGINA_PERMISSAO`, `checkPermissao`, `lojasPermitidas`, `verificarAcessoPagina`, `getFiltroLojaPadrao` |
 | 5 | Estoque | `getStatusEstoque`, `getItensAbaixoMinimo`, `getItensZerados`, `registrarMovimentacao`, `registrarTransferencia`, `adicionarItem`, `editarItem`, `excluirItem`, `getHistoricoPrecos`, `getUltimoPrecoPago`, `getIndicadorPreco` |
 | 6 | Formatação | `fmt`, `fmtR`, `fmtDate`, `fmtDateFull` |
 | 7 | UI Helpers | `toast`, `destacarCampoPendente`, `initClearButton`, `initAutocompleteTeclado`, `openModal`/`closeModal`, `initSidebarMobile`, `NAV_ITEMS`, `buildSidebar`, `buildTopbar`, `initTopbar`, `getLojaAtiva`/`setLojaAtiva`, `abrirSeletorLoja` |
@@ -397,7 +400,10 @@ Consequências importantes (por não estarem na lista de nenhum perfil, exceto a
   Transferência, Estoque, Pedidos), confirmação por Enter no campo de quantidade
   (Saídas/Transferências/nota manual de Entradas) com destaque visual do campo pendente
   quando faltar algo, motivo de saída mantido entre lançamentos consecutivos, e botão
-  "Limpar formulário" em Saídas/Transferências/Entradas. Detalhes completos em
+  "Limpar formulário" em Saídas/Transferências/Entradas. Revisada após implementação:
+  corrigido um bug em que `Esc` não fechava o autocomplete quando a busca não trazia
+  resultados, e removida duplicação de código (`getFiltroLojaPadrao` centralizada em
+  `app.js`; CSS do autocomplete centralizado em `style.css`). Detalhes completos em
   `docs/CHANGELOG.md`.
 
 ## 10. Funcionalidades em andamento
@@ -445,9 +451,13 @@ Consequências importantes (por não estarem na lista de nenhum perfil, exceto a
    referenciados por nenhuma página.
 7. **Resíduo de patch já aplicado**: `0001-fix-mobile-responsavel.patch` na raiz do repo
    corresponde ao commit `292c3ca` (já mesclado) — candidato a remoção.
-8. **Duplicação de código**: o bloco de busca/autocomplete de item é praticamente
-   idêntico entre `saidas.html` e `transferencias.html` — poderia virar uma função
-   compartilhada em `app.js`.
+8. ~~**Duplicação de código**: o bloco de busca/autocomplete de item é praticamente
+   idêntico entre `saidas.html` e `transferencias.html`.~~ **Resolvido em 2026-07-10**: o
+   CSS do autocomplete foi centralizado em `assets/style.css`, e a navegação por teclado
+   foi extraída para `initAutocompleteTeclado()` em `app.js`. Ainda resta alguma
+   duplicação de menor porte no padrão de mostrar/esconder `busca-wrap`/
+   `item-selecionado-wrap` entre as duas páginas — não extraída por ser um refactor maior
+   do que o justificável isoladamente.
 9. **Zero testes automatizados** e **zero verificação (lint/build) no CI** antes do
    deploy — `deploy.yml` publica direto a cada push em `main`.
 10. **API key da Anthropic em texto puro no `localStorage`** do navegador (visível via
@@ -480,23 +490,44 @@ foi identificado e corrigido — ver commit `90fe0fc`.)*
 
 ## 14. Próximos passos recomendados
 
-1. **Decidir o destino da arquitetura de dados** antes de qualquer refatoração grande:
-   continuar em `localStorage` (aceitando a limitação single-device) ou migrar para um
-   backend real (API própria + banco, ou BaaS como Supabase/Firebase) para permitir
-   múltiplas lojas/usuários simultâneos de verdade.
-2. Se a decisão for migrar para backend: desenhar a API (REST ou GraphQL), mover as
-   regras de negócio hoje em `assets/app.js` (seções 4 a 5) para o servidor, e
-   implementar autenticação real (hash + sessão/JWT com expiração).
+### 14.1 Roadmap de produto (pendências conhecidas, ainda não iniciadas)
+
+- **Ficha Técnica** de produtos (pizzas/receitas): associar cada item de estoque a
+  receitas/composições — hoje o sistema só controla insumos avulsos, sem noção de
+  "quanto de cada insumo entra em cada produto final".
+- **CMV (Custo da Mercadoria Vendida)**: depende da Ficha Técnica acima para calcular
+  custo real por produto vendido; hoje só existe valor de estoque parado
+  (`qty × precoUnit`), sem relacionar a vendas.
+- **Backup/restauração de dados**: hoje não existe nenhuma forma de exportar/importar o
+  `localStorage` inteiro (só exports pontuais de CSV/XLSX) — um backup real precisaria
+  cobrir `lbd_data_v1` por completo (itens, histórico, fornecedores).
+- **Importação de relatório do Saipos**: nenhuma integração hoje com o Saipos (sistema de
+  PDV usado, presumivelmente, para as vendas) — permitiria cruzar vendas reais com baixa
+  de estoque/CMV automaticamente.
+- **Migração futura para Supabase**: caminho considerado para resolver o débito técnico
+  #1 (seção 12) — trocar `localStorage` por um backend real (Postgres + Auth + Realtime
+  do Supabase), habilitando múltiplas lojas/usuários sincronizados de verdade.
+
+### 14.2 Recomendações técnicas de suporte ao roadmap acima
+
+1. **Decidir o momento da migração de arquitetura de dados**: as pendências de produto
+   acima (CMV, importação Saipos, backup) ficam bem mais simples com um backend real —
+   vale avaliar se compensa migrar para Supabase *antes* de construir CMV/Saipos em cima
+   do `localStorage` atual, para não implementar duas vezes.
+2. Se a decisão for migrar para Supabase (ou outro backend): desenhar o schema
+   (itens/histórico/fornecedores/usuários), mover as regras de negócio hoje em
+   `assets/app.js` (seções 4 a 5) para o servidor/RLS, e implementar autenticação real
+   (Supabase Auth substituiria o `login()` trivial atual).
 3. Extrair `USUARIOS` e `FORNECEDORES` para telas de administração (CRUD via UI), em vez
-   de hardcoded no JS.
+   de hardcoded no JS — pré-requisito natural se/quando usuários passarem a ser
+   gerenciados num backend real.
 4. Validar/corrigir o `model` usado na chamada à API da Anthropic em `entradas.html`.
 5. Introduzir testes básicos (mesmo que só nas funções puras de `app.js`, como
    `getStatusEstoque`, `registrarMovimentacao`, `getIndicadorPreco`) **antes** de iniciar
    a reestruturação, para servir de rede de segurança contra regressões.
 6. Adicionar um passo de verificação (lint/build/testes) no `deploy.yml` antes do publish.
-7. Resolver os débitos técnicos "de baixo custo": remover `assets/db.js`,
-   `assets/icons.js` e `0001-fix-mobile-responsavel.patch`; unificar o autocomplete de
-   item duplicado entre Saídas e Transferências.
+7. Resolver os débitos técnicos "de baixo custo" restantes: remover `assets/db.js`,
+   `assets/icons.js` e `0001-fix-mobile-responsavel.patch`.
 8. Planejar como o `HISTORICO_PRECOS` (mock) vai ser substituído por preços reais assim
    que Entradas passar a persistir os preços pagos por nota.
 9. Definir um plano de migração de segredos (API key da Anthropic) para fora de arquivos

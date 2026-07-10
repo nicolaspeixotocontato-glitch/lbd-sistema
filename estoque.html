@@ -452,12 +452,6 @@
       renderTabela();
     });
 
-    function getFiltroLojaPadrao() {
-      if (checkPermissao('ver_outras_lojas')) return 'todas';
-      const usuario = getUsuarioAtivo();
-      return usuario ? usuario.loja : 'todas';
-    }
-
     document.getElementById('btn-limpar-filtros').addEventListener('click', () => {
       filtroLoja = getFiltroLojaPadrao();
       filtroCategoria = 'todas';
