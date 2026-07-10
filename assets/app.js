@@ -336,6 +336,15 @@ function editarItem(itemId, campos) {
   return { ok: true, item };
 }
 
+function excluirItem(itemId) {
+  const data = getData();
+  const item = data.itens.find((i) => i.id === itemId);
+  if (!item) return { ok: false, erro: 'Item não encontrado.' };
+  item.ativo = false;
+  saveData(data);
+  return { ok: true, item };
+}
+
 /* ==========================================================================
    6. Formatação
    ========================================================================== */

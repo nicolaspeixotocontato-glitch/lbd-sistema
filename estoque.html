@@ -329,7 +329,10 @@
               <td class="td-num">${fmtR(l.item.precoUnit)}</td>
               <td class="td-num">${fmtR(valorTotal)}</td>
               <td>
-                ${checkPermissao('editar_estoque') ? `<button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Editar ${l.item.nome}" onclick="abrirEditar('${l.item.id}')">${ICONS.edit}</button>` : '<span class="td-muted">—</span>'}
+                ${checkPermissao('editar_estoque') ? `
+                  <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Editar ${l.item.nome}" onclick="abrirEditar('${l.item.id}')">${ICONS.edit}</button>
+                  <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Excluir ${l.item.nome}" onclick="abrirConfirmarExclusao('${l.item.id}')">${ICONS.trash}</button>
+                ` : '<span class="td-muted">—</span>'}
               </td>
             </tr>
           `;
@@ -394,6 +397,53 @@
       openModal('modal-editar-item');
     }
 
+    function abrirConfirmarExclusao(itemId) {
+      if (!checkPermissao('editar_estoque')) {
+        toast('Você não tem permissão para excluir itens.', 'error');
+        return;
+      }
+      const data = getData();
+      const item = data.itens.find((i) => i.id === itemId);
+      if (!item) return;
+
+      let modal = document.getElementById('modal-confirmar-exclusao');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-confirmar-exclusao';
+        modal.className = 'modal-backdrop';
+        modal.style.display = 'none';
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal('modal-confirmar-exclusao');
+        });
+      }
+
+      modal.innerHTML = `
+        <div class="modal" style="max-width:380px">
+          <div class="modal-header">
+            <span class="modal-title">Excluir item</span>
+            <button class="modal-close" type="button" aria-label="Fechar" onclick="closeModal('modal-confirmar-exclusao')">${ICONS.close}</button>
+          </div>
+          <div class="modal-body">
+            <p>Tem certeza que deseja excluir <strong>${item.nome}</strong>? Essa ação pode ser desfeita reativando o item depois.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost btn-md" type="button" onclick="closeModal('modal-confirmar-exclusao')">Cancelar</button>
+            <button class="btn btn-danger btn-md" type="button" onclick="confirmarExclusaoItem('${itemId}')">Excluir</button>
+          </div>
+        </div>
+      `;
+
+      openModal('modal-confirmar-exclusao');
+    }
+
+    function confirmarExclusaoItem(itemId) {
+      excluirItem(itemId);
+      closeModal('modal-confirmar-exclusao');
+      toast('Item excluído com sucesso.', 'success');
+      renderTabela();
+    }
+
     document.getElementById('busca-input').addEventListener('input', (e) => {
       buscaTexto = e.target.value;
       renderTabela();
@@ -409,6 +459,13 @@
 
       if (!nome || !un) {
         toast('Preencha nome e unidade.', 'error');
+        return;
+      }
+
+      const nomeComparavel = nome.toLowerCase();
+      const jaExiste = getData().itens.some((i) => i.ativo && i.nome.trim().toLowerCase() === nomeComparavel);
+      if (jaExiste) {
+        toast('Já existe um item ativo com esse nome.', 'error');
         return;
       }
 
