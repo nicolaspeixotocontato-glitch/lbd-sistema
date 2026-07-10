@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estoque — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .qty-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 90px;
+    }
+
+    .qty-cell-value {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+
+    .filters-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .modal-form-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 class="page-title">Estoque</h1>
+          <p class="page-subtitle">Consulte e gerencie os insumos cadastrados</p>
+        </div>
+        <button class="btn btn-primary btn-md" type="button" id="btn-novo-item" onclick="abrirNovoItem()"></button>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-body flex flex-col gap-16">
+          <div class="filters-row">
+            <div class="loja-tabs" id="loja-tabs"></div>
+            <div class="search-input" style="max-width:300px; flex:1;">
+              <span class="search-input-icon" id="search-icon"></span>
+              <input type="text" id="busca-input" placeholder="Buscar por nome ou ID...">
+            </div>
+          </div>
+          <div class="filter-chips" id="categoria-chips"></div>
+          <div class="filter-chips" id="status-chips"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header flex items-center justify-between">
+          <span class="card-title">Itens em estoque</span>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="exportarCSV()">Exportar CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Categoria</th>
+                <th>UN</th>
+                <th>Estoque atual</th>
+                <th>Mínimo</th>
+                <th>Status</th>
+                <th class="td-num">Preço unit.</th>
+                <th class="td-num">Valor total</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="estoque-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card-footer flex items-center justify-between">
+          <span class="text-secondary" id="footer-total-itens"></span>
+          <span style="font-weight:600" id="footer-valor-total"></span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Novo item -->
+  <div class="modal-backdrop" id="modal-novo-item" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Novo item</span>
+        <button class="modal-close" type="button" aria-label="Fechar" onclick="closeModal('modal-novo-item')" id="close-novo-item"></button>
+      </div>
+      <form id="form-novo-item">
+        <div class="modal-body modal-form-body">
+          <div class="form-group">
+            <label class="form-label" for="novo-nome">Nome</label>
+            <input class="form-input" type="text" id="novo-nome" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="novo-categoria">Categoria</label>
+              <select class="form-select" id="novo-categoria" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="novo-unidade">Unidade</label>
+              <input class="form-input" type="text" id="novo-unidade" placeholder="kg, un, L..." required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="novo-preco">Preço unitário (R$)</label>
+            <input class="form-input" type="number" id="novo-preco" min="0" step="0.01" required>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Estoque mínimo por loja</label>
+            <div class="form-row">
+              <input class="form-input" type="number" id="novo-min-LBD01" min="0" step="0.01" placeholder="LBD01">
+              <input class="form-input" type="number" id="novo-min-LBD02" min="0" step="0.01" placeholder="LBD02">
+            </div>
+            <div class="form-row mt-16">
+              <input class="form-input" type="number" id="novo-min-LBD03" min="0" step="0.01" placeholder="LBD03">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost btn-md" type="button" onclick="closeModal('modal-novo-item')">Cancelar</button>
+          <button class="btn btn-primary btn-md" type="submit">Salvar item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Editar item -->
+  <div class="modal-backdrop" id="modal-editar-item" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Editar item</span>
+        <button class="modal-close" type="button" aria-label="Fechar" onclick="closeModal('modal-editar-item')" id="close-editar-item"></button>
+      </div>
+      <form id="form-editar-item">
+        <div class="modal-body modal-form-body">
+          <div class="form-group">
+            <label class="form-label" for="editar-nome">Nome</label>
+            <input class="form-input" type="text" id="editar-nome" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="editar-categoria">Categoria</label>
+              <select class="form-select" id="editar-categoria" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editar-unidade">Unidade</label>
+              <input class="form-input" type="text" id="editar-unidade" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editar-preco">Preço unitário (R$)</label>
+            <input class="form-input" type="number" id="editar-preco" min="0" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Estoque mínimo por loja</label>
+            <div class="form-row">
+              <input class="form-input" type="number" id="editar-min-LBD01" min="0" step="0.01" placeholder="LBD01">
+              <input class="form-input" type="number" id="editar-min-LBD02" min="0" step="0.01" placeholder="LBD02">
+            </div>
+            <div class="form-row mt-16">
+              <input class="form-input" type="number" id="editar-min-LBD03" min="0" step="0.01" placeholder="LBD03">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Quantidade atual por loja</label>
+            <div class="form-row">
+              <input class="form-input" type="number" id="editar-qty-LBD01" min="0" step="0.01" placeholder="LBD01">
+              <input class="form-input" type="number" id="editar-qty-LBD02" min="0" step="0.01" placeholder="LBD02">
+            </div>
+            <div class="form-row mt-16">
+              <input class="form-input" type="number" id="editar-qty-LBD03" min="0" step="0.01" placeholder="LBD03">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost btn-md" type="button" onclick="closeModal('modal-editar-item')">Cancelar</button>
+          <button class="btn btn-primary btn-md" type="submit">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let filtroLoja = 'todas';
+    let filtroCategoria = 'todas';
+    let filtroStatus = 'todos';
+    let buscaTexto = '';
+    let itemEditandoId = null;
+
+    const STATUS_OPCOES = [
+      { value: 'todos', label: 'Todos' },
+      { value: 'low', label: 'Baixo' },
+      { value: 'out', label: 'Zerado' },
+      { value: 'ok', label: 'OK' },
+    ];
+
+    function popularSelectsCategoria() {
+      const options = CATEGORIAS.map((c) => `<option value="${c}">${c}</option>`).join('');
+      document.getElementById('novo-categoria').innerHTML = options;
+      document.getElementById('editar-categoria').innerHTML = options;
+    }
+
+    function getScopeLojas() {
+      return filtroLoja === 'todas' ? LOJAS.map((l) => l.id) : [filtroLoja];
+    }
+
+    function statusAgregado(item, scope) {
+      const qty = scope.reduce((acc, l) => acc + (item.qty[l] || 0), 0);
+      const min = scope.reduce((acc, l) => acc + (item.min[l] || 0), 0);
+      const pct = min > 0 ? Math.min(100, Math.round((qty / min) * 100)) : 100;
+      if (qty <= 0) return { status: 'out', label: 'Zerado', pct: 0, qty, min };
+      if (qty < min) return { status: 'low', label: 'Estoque baixo', pct, qty, min };
+      return { status: 'ok', label: 'Em estoque', pct, qty, min };
+    }
+
+    function renderLojaTabs() {
+      const opcoes = [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))];
+      document.getElementById('loja-tabs').innerHTML = opcoes.map((o) => `
+        <button type="button" class="loja-tab${o.id === filtroLoja ? ' is-active' : ''}" onclick="setFiltroLoja('${o.id}')">${o.label}</button>
+      `).join('');
+    }
+
+    function renderCategoriaChips() {
+      const opcoes = ['todas', ...CATEGORIAS];
+      document.getElementById('categoria-chips').innerHTML = opcoes.map((c) => `
+        <button type="button" class="filter-chip${c === filtroCategoria ? ' is-active' : ''}" onclick="setFiltroCategoria('${c}')">${c === 'todas' ? 'Todas categorias' : c}</button>
+      `).join('');
+    }
+
+    function renderStatusChips() {
+      document.getElementById('status-chips').innerHTML = STATUS_OPCOES.map((o) => `
+        <button type="button" class="filter-chip${o.value === filtroStatus ? ' is-active' : ''}" onclick="setFiltroStatus('${o.value}')">${o.label}</button>
+      `).join('');
+    }
+
+    function setFiltroLoja(id) { filtroLoja = id; renderAll(); }
+    function setFiltroCategoria(c) { filtroCategoria = c; renderAll(); }
+    function setFiltroStatus(s) { filtroStatus = s; renderAll(); }
+
+    function getItensFiltrados() {
+      const data = getData();
+      const scope = getScopeLojas();
+      const busca = buscaTexto.trim().toLowerCase();
+
+      let itens = data.itens.filter((i) => i.ativo);
+
+      if (busca) {
+        itens = itens.filter((i) => i.nome.toLowerCase().includes(busca) || i.id.toLowerCase().includes(busca));
+      }
+      if (filtroCategoria !== 'todas') {
+        itens = itens.filter((i) => i.cat === filtroCategoria);
+      }
+
+      let linhas = itens.map((item) => ({ item, ...statusAgregado(item, scope) }));
+
+      if (filtroStatus !== 'todos') {
+        linhas = linhas.filter((l) => l.status === filtroStatus);
+      }
+
+      const ordem = { out: 0, low: 1, ok: 2 };
+      linhas.sort((a, b) => {
+        if (ordem[a.status] !== ordem[b.status]) return ordem[a.status] - ordem[b.status];
+        return a.item.nome.localeCompare(b.item.nome, 'pt-BR');
+      });
+
+      return linhas;
+    }
+
+    function badgeClass(status) {
+      if (status === 'out') return 'badge-out';
+      if (status === 'low') return 'badge-low';
+      return 'badge-ok';
+    }
+
+    function renderTabela() {
+      const linhas = getItensFiltrados();
+      const tbody = document.getElementById('estoque-tbody');
+
+      if (linhas.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10">
+              <div class="empty-state">
+                <span class="empty-state-icon">${ICONS.search}</span>
+                <div class="empty-state-title">Nenhum item encontrado</div>
+                <div class="empty-state-subtitle">Ajuste os filtros ou cadastre um novo item.</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      } else {
+        tbody.innerHTML = linhas.map((l) => {
+          const valorTotal = l.qty * l.item.precoUnit;
+          return `
+            <tr>
+              <td class="td-muted">${l.item.id}</td>
+              <td>${l.item.nome}</td>
+              <td class="td-muted">${l.item.cat}</td>
+              <td class="td-muted">${l.item.un}</td>
+              <td>
+                <div class="qty-cell">
+                  <span class="qty-cell-value">${fmt(l.qty)}</span>
+                  <div class="progress"><div class="progress-bar is-${l.status}" style="width:${l.pct}%"></div></div>
+                </div>
+              </td>
+              <td class="td-num">${fmt(l.min)}</td>
+              <td><span class="badge ${badgeClass(l.status)}">${l.label}</span></td>
+              <td class="td-num">${fmtR(l.item.precoUnit)}</td>
+              <td class="td-num">${fmtR(valorTotal)}</td>
+              <td>
+                <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Editar ${l.item.nome}" onclick="abrirEditar('${l.item.id}')">${ICONS.edit}</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      const totalItens = linhas.length;
+      const valorTotalFiltrado = linhas.reduce((acc, l) => acc + l.qty * l.item.precoUnit, 0);
+      document.getElementById('footer-total-itens').textContent = `${totalItens} ${totalItens === 1 ? 'item exibido' : 'itens exibidos'}`;
+      document.getElementById('footer-valor-total').textContent = `Total: ${fmtR(valorTotalFiltrado)}`;
+    }
+
+    function renderAll() {
+      renderLojaTabs();
+      renderCategoriaChips();
+      renderStatusChips();
+      renderTabela();
+    }
+
+    function pintarIconesEstaticos() {
+      document.getElementById('search-icon').innerHTML = ICONS.search;
+      document.getElementById('close-novo-item').innerHTML = ICONS.close;
+      document.getElementById('close-editar-item').innerHTML = ICONS.close;
+      document.getElementById('btn-novo-item').innerHTML = `${ICONS.plus} Novo item`;
+    }
+
+    function abrirNovoItem() {
+      document.getElementById('form-novo-item').reset();
+      openModal('modal-novo-item');
+    }
+
+    function abrirEditar(itemId) {
+      const data = getData();
+      const item = data.itens.find((i) => i.id === itemId);
+      if (!item) return;
+
+      itemEditandoId = itemId;
+      document.getElementById('editar-nome').value = item.nome;
+      document.getElementById('editar-categoria').value = item.cat;
+      document.getElementById('editar-unidade').value = item.un;
+      document.getElementById('editar-preco').value = item.precoUnit;
+      LOJAS.forEach((l) => {
+        document.getElementById(`editar-min-${l.id}`).value = item.min[l.id] || 0;
+        document.getElementById(`editar-qty-${l.id}`).value = item.qty[l.id] || 0;
+      });
+
+      openModal('modal-editar-item');
+    }
+
+    document.getElementById('busca-input').addEventListener('input', (e) => {
+      buscaTexto = e.target.value;
+      renderTabela();
+    });
+
+    document.getElementById('form-novo-item').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const nome = document.getElementById('novo-nome').value.trim();
+      const cat = document.getElementById('novo-categoria').value;
+      const un = document.getElementById('novo-unidade').value.trim();
+      const precoUnit = Number(document.getElementById('novo-preco').value) || 0;
+
+      if (!nome || !un) {
+        toast('Preencha nome e unidade.', 'error');
+        return;
+      }
+
+      const min = {};
+      LOJAS.forEach((l) => {
+        min[l.id] = Number(document.getElementById(`novo-min-${l.id}`).value) || 0;
+      });
+
+      adicionarItem({ nome, cat, un, precoUnit, min, qty: { LBD01: 0, LBD02: 0, LBD03: 0 } });
+      closeModal('modal-novo-item');
+      toast('Item cadastrado com sucesso.', 'success');
+      renderTabela();
+    });
+
+    document.getElementById('form-editar-item').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!itemEditandoId) return;
+
+      const nome = document.getElementById('editar-nome').value.trim();
+      const cat = document.getElementById('editar-categoria').value;
+      const un = document.getElementById('editar-unidade').value.trim();
+      const precoUnit = Number(document.getElementById('editar-preco').value) || 0;
+
+      if (!nome || !un) {
+        toast('Preencha nome e unidade.', 'error');
+        return;
+      }
+
+      const min = {};
+      const qty = {};
+      LOJAS.forEach((l) => {
+        min[l.id] = Number(document.getElementById(`editar-min-${l.id}`).value) || 0;
+        qty[l.id] = Number(document.getElementById(`editar-qty-${l.id}`).value) || 0;
+      });
+
+      editarItem(itemEditandoId, { nome, cat, un, precoUnit, min, qty });
+      closeModal('modal-editar-item');
+      toast('Item atualizado com sucesso.', 'success');
+      renderTabela();
+    });
+
+    function exportarCSV() {
+      const linhas = getItensFiltrados();
+      const header = ['ID', 'Nome', 'Categoria', 'UN', 'Estoque atual', 'Mínimo', 'Status', 'Preço unit.', 'Valor total'];
+      const rows = linhas.map((l) => [
+        l.item.id,
+        l.item.nome,
+        l.item.cat,
+        l.item.un,
+        l.qty,
+        l.min,
+        l.label,
+        l.item.precoUnit.toFixed(2),
+        (l.qty * l.item.precoUnit).toFixed(2),
+      ]);
+
+      const csv = [header, ...rows]
+        .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+        .join('\r\n');
+
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `estoque_${filtroLoja}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    initTopbar('estoque');
+    popularSelectsCategoria();
+    pintarIconesEstaticos();
+    renderAll();
+  </script>
+</body>
+</html>

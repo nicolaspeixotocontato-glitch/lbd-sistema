@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saídas — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+      background: var(--surface-elevated); border: 1px solid var(--border-strong);
+      border-radius: var(--radius); max-height: 240px; overflow-y: auto; box-shadow: var(--shadow-lg);
+    }
+    .autocomplete-item { padding: 10px 14px; font-size: var(--fs-13); cursor: pointer; }
+    .autocomplete-item:hover { background: var(--hover); }
+    .item-selecionado { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--accent-dim); border: 1px solid rgba(77,184,160,0.3); border-radius: var(--radius); font-size: var(--fs-13); }
+    .qty-controls { display: flex; align-items: center; gap: 8px; }
+    .qty-controls input { max-width: 100px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="mb-16">
+        <h1 class="page-title">Saídas</h1>
+        <p class="page-subtitle">Registre retiradas de estoque</p>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="sessao-loja">Loja</label>
+              <select class="form-select" id="sessao-loja"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="sessao-responsavel">Responsável</label>
+              <input class="form-input" type="text" id="sessao-responsavel" placeholder="Nome do responsável">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-header"><span class="card-title">Nova saída</span></div>
+        <div class="card-body flex flex-col gap-16">
+          <div class="form-group autocomplete-wrap" style="margin-bottom:0" id="busca-wrap">
+            <label class="form-label" for="busca-item">Item</label>
+            <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off">
+            <div class="autocomplete-list" id="autocomplete-list" style="display:none"></div>
+          </div>
+          <div id="item-selecionado-wrap" style="display:none">
+            <div class="item-selecionado">
+              <span id="item-selecionado-texto"></span>
+              <button class="btn btn-ghost btn-sm" id="btn-trocar-item" type="button">Trocar</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="motivo-select">Motivo</label>
+              <select class="form-select" id="motivo-select"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Quantidade</label>
+              <div class="qty-controls">
+                <button class="btn btn-secondary btn-icon btn-sm" id="qty-menos" type="button" aria-label="Diminuir">−</button>
+                <input class="form-input" type="number" id="qty-input" min="0" step="0.01" value="1">
+                <button class="btn btn-secondary btn-icon btn-sm" id="qty-mais" type="button" aria-label="Aumentar">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-error" id="qty-alerta" style="display:none"></div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary btn-md" id="btn-confirmar-saida" type="button" disabled>Confirmar saída</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Retiradas desta sessão</span></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Hora</th><th>Item</th><th class="td-num">Qtd</th><th>Motivo</th><th>Loja</th></tr>
+            </thead>
+            <tbody id="retiradas-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let itemSelecionado = null;
+    let retiradasSessao = [];
+
+    function popularSessao() {
+      const select = document.getElementById('sessao-loja');
+      select.innerHTML = LOJAS.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+      select.value = getLojaAtiva();
+      const usuario = getUsuarioAtivo();
+      document.getElementById('sessao-responsavel').value = usuario ? usuario.nome : '';
+
+      const motivoSelect = document.getElementById('motivo-select');
+      motivoSelect.innerHTML = '<option value="">Selecione...</option>' + MOTIVOS_SAIDA.map((m) => `<option value="${m}">${m}</option>`).join('');
+    }
+
+    function lojaAtual() { return document.getElementById('sessao-loja').value; }
+    function responsavelAtual() { return document.getElementById('sessao-responsavel').value.trim() || '—'; }
+
+    const buscaInput = document.getElementById('busca-item');
+    const listaEl = document.getElementById('autocomplete-list');
+
+    buscaInput.addEventListener('input', () => {
+      const termo = buscaInput.value.trim().toLowerCase();
+      if (!termo) { listaEl.style.display = 'none'; return; }
+
+      const resultados = getData().itens.filter((i) => i.ativo && i.nome.toLowerCase().includes(termo)).slice(0, 8);
+      if (resultados.length === 0) {
+        listaEl.innerHTML = '<div class="autocomplete-item text-muted">Nenhum item encontrado</div>';
+      } else {
+        listaEl.innerHTML = resultados.map((i) => {
+          const qtd = i.qty[lojaAtual()] || 0;
+          return `<div class="autocomplete-item" data-id="${i.id}">${i.nome} (${i.un}) — estoque: ${fmt(qtd)}</div>`;
+        }).join('');
+      }
+      listaEl.style.display = 'block';
+    });
+
+    listaEl.addEventListener('click', (e) => {
+      const el = e.target.closest('.autocomplete-item[data-id]');
+      if (!el) return;
+      selecionarItem(el.dataset.id);
+    });
+
+    function selecionarItem(itemId) {
+      itemSelecionado = getData().itens.find((i) => i.id === itemId);
+      listaEl.style.display = 'none';
+      buscaInput.value = '';
+      document.getElementById('busca-wrap').style.display = 'none';
+      document.getElementById('item-selecionado-wrap').style.display = 'block';
+      document.getElementById('item-selecionado-texto').textContent =
+        `${itemSelecionado.nome} (${itemSelecionado.un}) — estoque em ${lojaAtual()}: ${fmt(itemSelecionado.qty[lojaAtual()] || 0)}`;
+      validarQuantidade();
+    }
+
+    document.getElementById('btn-trocar-item').addEventListener('click', () => {
+      itemSelecionado = null;
+      document.getElementById('busca-wrap').style.display = '';
+      document.getElementById('item-selecionado-wrap').style.display = 'none';
+      validarQuantidade();
+    });
+
+    document.getElementById('sessao-loja').addEventListener('change', () => {
+      if (itemSelecionado) selecionarItem(itemSelecionado.id);
+      else validarQuantidade();
+    });
+
+    const qtyInput = document.getElementById('qty-input');
+    document.getElementById('qty-menos').addEventListener('click', () => {
+      qtyInput.value = Math.max(0, (Number(qtyInput.value) || 0) - 1);
+      validarQuantidade();
+    });
+    document.getElementById('qty-mais').addEventListener('click', () => {
+      qtyInput.value = (Number(qtyInput.value) || 0) + 1;
+      validarQuantidade();
+    });
+    qtyInput.addEventListener('input', validarQuantidade);
+    document.getElementById('motivo-select').addEventListener('change', validarQuantidade);
+
+    function validarQuantidade() {
+      const alerta = document.getElementById('qty-alerta');
+      const btn = document.getElementById('btn-confirmar-saida');
+      const qty = Number(qtyInput.value) || 0;
+      const motivo = document.getElementById('motivo-select').value;
+
+      if (itemSelecionado) {
+        const disponivel = itemSelecionado.qty[lojaAtual()] || 0;
+        if (qty > disponivel) {
+          alerta.textContent = `Quantidade maior que o estoque disponível (${fmt(disponivel)} ${itemSelecionado.un}).`;
+          alerta.style.display = '';
+          btn.disabled = true;
+          return;
+        }
+      }
+
+      alerta.style.display = 'none';
+      btn.disabled = !(itemSelecionado && qty > 0 && motivo);
+    }
+
+    document.getElementById('btn-confirmar-saida').addEventListener('click', () => {
+      const qty = Number(qtyInput.value) || 0;
+      const motivo = document.getElementById('motivo-select').value;
+      const loja = lojaAtual();
+      const usuario = getUsuarioAtivo();
+
+      const resultado = registrarMovimentacao('saida', loja, itemSelecionado.id, qty, motivo, usuario);
+      if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
+
+      retiradasSessao.unshift({ ts: Date.now(), item: itemSelecionado.nome, un: itemSelecionado.un, qty, motivo, loja });
+      renderRetiradas();
+      toast('Saída registrada com sucesso.', 'success');
+
+      itemSelecionado = null;
+      document.getElementById('busca-wrap').style.display = '';
+      document.getElementById('item-selecionado-wrap').style.display = 'none';
+      qtyInput.value = 1;
+      document.getElementById('motivo-select').value = '';
+      validarQuantidade();
+    });
+
+    function renderRetiradas() {
+      const tbody = document.getElementById('retiradas-tbody');
+      if (retiradasSessao.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><span class="empty-state-icon">${ICONS.saidas}</span><div class="empty-state-title">Nenhuma saída registrada</div><div class="empty-state-subtitle">As retiradas desta sessão aparecerão aqui.</div></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = retiradasSessao.map((r) => `
+        <tr>
+          <td class="td-muted">${fmtDate(r.ts)}</td>
+          <td>${r.item}</td>
+          <td class="td-num">${fmt(r.qty)} ${r.un}</td>
+          <td class="td-muted">${r.motivo}</td>
+          <td class="td-muted">${r.loja}</td>
+        </tr>
+      `).join('');
+    }
+
+    initTopbar('saidas');
+    popularSessao();
+    renderRetiradas();
+  </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Bella Donna — Login</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    body.login-body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 20%, rgba(77, 184, 160, 0.16), transparent 60%),
+        var(--bg);
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .login-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .login-logo-mark {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 6px var(--accent-dim);
+    }
+
+    .login-logo-mark svg {
+      width: 30px;
+      height: 30px;
+      color: #0A0A0A;
+    }
+
+    .login-logo-name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: var(--fs-32);
+      color: var(--text-primary);
+      line-height: 1;
+    }
+
+    .login-logo-name span {
+      color: var(--gold);
+    }
+
+    .login-logo-tag {
+      font-size: var(--fs-12);
+      color: var(--text-secondary);
+    }
+
+    .login-card {
+      width: 100%;
+    }
+
+    .login-error {
+      font-size: var(--fs-12);
+      color: var(--danger);
+      min-height: 16px;
+      margin-top: -8px;
+    }
+
+    .login-hint {
+      font-size: var(--fs-11);
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .login-footer {
+      font-size: var(--fs-11);
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body class="login-body">
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="login-logo-mark">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M2.5 9.5 12 2l9.5 7.5C19.4 8 15.9 7 12 7s-7.4 1-9.5 2.5Z"/>
+          <path d="M12 7c3.9 0 7.4 1 9.5 2.5L12 22 2.5 9.5C4.6 8 8.1 7 12 7Z" opacity="0.85"/>
+          <circle cx="9.5" cy="12.5" r="1" fill="#0A0A0A" stroke="none"/>
+          <circle cx="13.5" cy="14.5" r="1" fill="#0A0A0A" stroke="none"/>
+          <circle cx="11.5" cy="17.5" r="1" fill="#0A0A0A" stroke="none"/>
+        </svg>
+      </div>
+      <div class="login-logo-name">La Bella <span>Donna</span></div>
+      <div class="login-logo-tag">Gestão de Estoque | Porto Alegre</div>
+    </div>
+
+    <form class="card login-card" id="login-form" novalidate>
+      <div class="card-body flex flex-col gap-16">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="usuario">Usuário</label>
+          <select class="form-select" id="usuario" required></select>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="senha">Senha</label>
+          <input class="form-input" type="password" id="senha" autocomplete="current-password" required>
+        </div>
+
+        <div class="login-error" id="login-error" role="alert"></div>
+
+        <button class="btn btn-primary btn-md btn-full" type="submit">Entrar</button>
+
+        <div class="login-hint">Fase de testes: senha = seu nome em minúsculas</div>
+      </div>
+    </form>
+
+    <div class="login-footer">v<span id="app-version"></span></div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      if (getSession()) {
+        window.location.href = 'painel.html';
+        return;
+      }
+
+      document.getElementById('app-version').textContent = APP_VERSION;
+
+      const select = document.getElementById('usuario');
+      select.innerHTML = USUARIOS.map((u) => `<option value="${u.id}">${u.nome}</option>`).join('');
+
+      const form = document.getElementById('login-form');
+      const errorEl = document.getElementById('login-error');
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        errorEl.textContent = '';
+
+        const userId = select.value;
+        const senha = document.getElementById('senha').value;
+        const resultado = login(userId, senha);
+
+        if (!resultado.ok) {
+          errorEl.textContent = resultado.erro;
+          return;
+        }
+
+        window.location.href = 'painel.html';
+      });
+    })();
+  </script>
+</body>
+</html>

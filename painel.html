@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat-card--danger .stat-card-icon {
+      background: var(--danger-dim);
+      color: var(--danger);
+    }
+
+    .stat-card--danger {
+      border-color: rgba(192, 57, 43, 0.25);
+    }
+
+    .stat-card-icon-text {
+      font-size: var(--fs-13);
+      font-weight: 700;
+    }
+
+    .list-scroll {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 class="page-title">Painel</h1>
+          <p class="page-subtitle">Visão geral do estoque em tempo real</p>
+        </div>
+      </div>
+
+      <div class="loja-tabs mb-16" id="loja-tabs"></div>
+
+      <div class="stat-grid mb-16" id="stat-grid"></div>
+
+      <div class="dashboard-grid mb-16">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Alertas de estoque</span>
+          </div>
+          <div class="list-scroll" id="alertas-list"></div>
+          <div class="card-footer">
+            <a class="btn btn-ghost btn-sm" href="estoque.html">Ver estoque completo</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Histórico recente (24h)</span>
+          </div>
+          <div class="list-scroll" id="historico-list"></div>
+          <div class="card-footer">
+            <a class="btn btn-ghost btn-sm" href="historico.html">Ver histórico completo</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="resumo-lojas-card" style="display:none">
+        <div class="card-header">
+          <span class="card-title">Resumo por loja</span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Loja</th>
+                <th class="td-num">Itens</th>
+                <th class="td-num">Baixo</th>
+                <th class="td-num">Zerado</th>
+                <th class="td-num">Valor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="resumo-lojas-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let filtroLoja = 'todas';
+
+    function getScopeLojas() {
+      return filtroLoja === 'todas' ? LOJAS.map((l) => l.id) : [filtroLoja];
+    }
+
+    function renderLojaTabs() {
+      const opcoes = [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))];
+      document.getElementById('loja-tabs').innerHTML = opcoes.map((o) => `
+        <button type="button" class="loja-tab${o.id === filtroLoja ? ' is-active' : ''}" onclick="setFiltroLoja('${o.id}')">${o.label}</button>
+      `).join('');
+    }
+
+    function setFiltroLoja(id) {
+      filtroLoja = id;
+      renderAll();
+    }
+
+    function computeStats() {
+      const data = getData();
+      const scope = getScopeLojas();
+      const itensAtivos = data.itens.filter((i) => i.ativo);
+
+      const abaixoSet = new Set();
+      const zeradosSet = new Set();
+      let valorEstoque = 0;
+
+      itensAtivos.forEach((item) => {
+        scope.forEach((lojaId) => {
+          const st = getStatusEstoque(item, lojaId);
+          if (st.status === 'low' || st.status === 'out') abaixoSet.add(item.id);
+          if (st.status === 'out') zeradosSet.add(item.id);
+          valorEstoque += (item.qty[lojaId] || 0) * item.precoUnit;
+        });
+      });
+
+      const inicioHoje = new Date();
+      inicioHoje.setHours(0, 0, 0, 0);
+
+      const movimentacoesHoje = data.historico.filter((h) => {
+        if (h.ts < inicioHoje.getTime()) return false;
+        if (h.tipo === 'transferencia') return scope.includes(h.origemId) || scope.includes(h.destinoId);
+        return scope.includes(h.lojaId);
+      }).length;
+
+      return {
+        totalItens: itensAtivos.length,
+        abaixoMinimo: abaixoSet.size,
+        zerados: zeradosSet.size,
+        valorEstoque,
+        movimentacoesHoje,
+      };
+    }
+
+    function renderStatCards() {
+      const s = computeStats();
+      const cards = [
+        { label: 'Total de itens', value: fmt(s.totalItens), variant: 'mint', icon: ICONS.estoque },
+        { label: 'Abaixo do mínimo', value: fmt(s.abaixoMinimo), variant: 'warning', icon: ICONS.alert },
+        { label: 'Zerados', value: fmt(s.zerados), variant: 'danger', icon: ICONS.trash },
+        { label: 'Valor do estoque', value: fmtR(s.valorEstoque), variant: 'gold', icon: null },
+        { label: 'Movimentações hoje', value: fmt(s.movimentacoesHoje), variant: 'success', icon: ICONS.swap },
+      ];
+
+      document.getElementById('stat-grid').innerHTML = cards.map((c) => `
+        <div class="stat-card stat-card--${c.variant}">
+          <div class="stat-card-icon">${c.icon || '<span class="stat-card-icon-text">R$</span>'}</div>
+          <div class="stat-card-value">${c.value}</div>
+          <div class="stat-card-label">${c.label}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderAlertas() {
+      const data = getData();
+      const scope = getScopeLojas();
+      const linhas = [];
+
+      data.itens.filter((i) => i.ativo).forEach((item) => {
+        scope.forEach((lojaId) => {
+          const st = getStatusEstoque(item, lojaId);
+          if (st.status === 'low' || st.status === 'out') {
+            linhas.push({ item, lojaId, ...st });
+          }
+        });
+      });
+
+      linhas.sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'out' ? -1 : 1;
+        return a.pct - b.pct;
+      });
+
+      const el = document.getElementById('alertas-list');
+
+      if (linhas.length === 0) {
+        el.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-state-icon">${ICONS.check}</span>
+            <div class="empty-state-title">Tudo sob controle</div>
+            <div class="empty-state-subtitle">Nenhum item abaixo do mínimo nesta seleção.</div>
+          </div>
+        `;
+        return;
+      }
+
+      el.innerHTML = linhas.slice(0, 10).map((l) => `
+        <div class="alert-row">
+          <div class="alert-row-icon${l.status === 'out' ? ' is-out' : ''}">${ICONS.alert}</div>
+          <div class="alert-row-body">
+            <div class="alert-row-name">${l.item.nome} <span class="text-muted">— ${l.lojaId}</span></div>
+            <div class="progress"><div class="progress-bar is-${l.status}" style="width:${l.pct}%"></div></div>
+          </div>
+          <div class="alert-row-qty">${fmt(l.item.qty[l.lojaId])} / ${fmt(l.item.min[l.lojaId])} ${l.item.un}</div>
+        </div>
+      `).join('');
+    }
+
+    function iconHistorico(tipo) {
+      if (tipo === 'entrada') return { icon: ICONS['arrow-down'], cls: 'is-in' };
+      if (tipo === 'saida') return { icon: ICONS['arrow-up'], cls: 'is-out' };
+      return { icon: ICONS.swap, cls: 'is-transfer' };
+    }
+
+    function renderHistorico() {
+      const data = getData();
+      const scope = getScopeLojas();
+      const inicio24h = Date.now() - 1000 * 60 * 60 * 24;
+
+      const eventos = data.historico.filter((h) => {
+        if (h.ts < inicio24h) return false;
+        if (h.tipo === 'transferencia') return scope.includes(h.origemId) || scope.includes(h.destinoId);
+        return scope.includes(h.lojaId);
+      }).sort((a, b) => b.ts - a.ts);
+
+      const el = document.getElementById('historico-list');
+
+      if (eventos.length === 0) {
+        el.innerHTML = `
+          <div class="empty-state">
+            <span class="empty-state-icon">${ICONS.historico}</span>
+            <div class="empty-state-title">Sem movimentações</div>
+            <div class="empty-state-subtitle">Nada registrado nas últimas 24 horas.</div>
+          </div>
+        `;
+        return;
+      }
+
+      el.innerHTML = eventos.slice(0, 10).map((h) => {
+        const item = data.itens.find((i) => i.id === h.itemId);
+        const nomeItem = item ? item.nome : 'Item removido';
+        const un = item ? item.un : '';
+        const { icon, cls } = iconHistorico(h.tipo);
+
+        let titulo;
+        let meta;
+        let qtyLabel;
+
+        if (h.tipo === 'entrada') {
+          titulo = `Entrada: ${nomeItem}`;
+          meta = `${h.lojaId} • ${h.userNome || '—'} • ${fmtDate(h.ts)}`;
+          qtyLabel = `+${fmt(h.qty)} ${un}`;
+        } else if (h.tipo === 'saida') {
+          titulo = `Saída: ${nomeItem}`;
+          meta = `${h.lojaId}${h.motivo ? ' • ' + h.motivo : ''} • ${h.userNome || '—'} • ${fmtDate(h.ts)}`;
+          qtyLabel = `-${fmt(h.qty)} ${un}`;
+        } else {
+          titulo = `Transferência: ${nomeItem}`;
+          meta = `${h.origemId} → ${h.destinoId} • ${h.userNome || '—'} • ${fmtDate(h.ts)}`;
+          qtyLabel = `${fmt(h.qty)} ${un}`;
+        }
+
+        return `
+          <div class="hist-row">
+            <div class="hist-row-icon ${cls}">${icon}</div>
+            <div class="hist-row-info">
+              <div class="hist-row-title">${titulo}</div>
+              <div class="hist-row-meta">${meta}</div>
+            </div>
+            <div class="hist-row-qty">${qtyLabel}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderResumoLojas() {
+      const usuario = getUsuarioAtivo();
+      const card = document.getElementById('resumo-lojas-card');
+      if (!usuario || usuario.perfil !== 'admin') {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = '';
+
+      const data = getData();
+      const itensAtivos = data.itens.filter((i) => i.ativo);
+
+      const linhas = LOJAS.map((loja) => {
+        let baixo = 0;
+        let zerado = 0;
+        let valor = 0;
+
+        itensAtivos.forEach((item) => {
+          const st = getStatusEstoque(item, loja.id);
+          if (st.status === 'low') baixo += 1;
+          if (st.status === 'out') zerado += 1;
+          valor += (item.qty[loja.id] || 0) * item.precoUnit;
+        });
+
+        let badge = '<span class="badge badge-ok">OK</span>';
+        if (zerado > 0) badge = '<span class="badge badge-out">Crítico</span>';
+        else if (baixo > 0) badge = '<span class="badge badge-low">Atenção</span>';
+
+        return `
+          <tr>
+            <td>${loja.label}</td>
+            <td class="td-num">${fmt(itensAtivos.length)}</td>
+            <td class="td-num">${fmt(baixo)}</td>
+            <td class="td-num">${fmt(zerado)}</td>
+            <td class="td-num">${fmtR(valor)}</td>
+            <td>${badge}</td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('resumo-lojas-body').innerHTML = linhas;
+    }
+
+    function renderAll() {
+      renderLojaTabs();
+      renderStatCards();
+      renderAlertas();
+      renderHistorico();
+      renderResumoLojas();
+    }
+
+    initTopbar('painel');
+    renderAll();
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .filters-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .pagination { display: flex; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="mb-16">
+        <h1 class="page-title">Histórico</h1>
+        <p class="page-subtitle">Todas as movimentações de estoque</p>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-body flex flex-col gap-16">
+          <div class="filters-row">
+            <div class="loja-tabs" id="loja-tabs"></div>
+            <div class="search-input" style="max-width:280px; flex:1;">
+              <span class="search-input-icon" id="search-icon"></span>
+              <input type="text" id="busca-input" placeholder="Buscar por item ou usuário...">
+            </div>
+          </div>
+          <div class="filter-chips" id="tipo-chips"></div>
+          <div class="filter-chips" id="periodo-chips"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Movimentações</span></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Data/Hora</th><th>Tipo</th><th>Loja</th><th>Item</th>
+                <th class="td-num">Qtd</th><th>Usuário</th><th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody id="historico-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card-footer filters-row">
+          <span class="text-secondary" id="footer-total"></span>
+          <div class="flex items-center gap-16" style="flex-wrap:wrap;">
+            <div class="pagination" id="pagination"></div>
+            <button class="btn btn-secondary btn-sm" id="btn-exportar-csv" type="button">Exportar CSV</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let filtroLoja = 'todas';
+    let filtroTipo = 'todos';
+    let filtroPeriodo = 'todos';
+    let busca = '';
+    let paginaAtual = 1;
+    const PAGE_SIZE = 20;
+
+    const TIPO_OPCOES = [
+      { value: 'todos', label: 'Todos' },
+      { value: 'entrada', label: 'Entrada' },
+      { value: 'saida', label: 'Saída' },
+      { value: 'transferencia', label: 'Transferência' },
+    ];
+    const PERIODO_OPCOES = [
+      { value: 'todos', label: 'Todos' },
+      { value: 'hoje', label: 'Hoje' },
+      { value: '7dias', label: 'Últimos 7 dias' },
+      { value: '30dias', label: 'Últimos 30 dias' },
+    ];
+    const TIPO_BADGE = {
+      entrada: { cls: 'badge-ok', label: 'Entrada' },
+      saida: { cls: 'badge-out', label: 'Saída' },
+      transferencia: { cls: 'badge-info', label: 'Transferência' },
+    };
+
+    function renderLojaTabs() {
+      const opcoes = [{ id: 'todas', label: 'Todas' }, ...LOJAS.map((l) => ({ id: l.id, label: l.id }))];
+      document.getElementById('loja-tabs').innerHTML = opcoes.map((o) => `
+        <button type="button" class="loja-tab${o.id === filtroLoja ? ' is-active' : ''}" onclick="setFiltro('loja','${o.id}')">${o.label}</button>
+      `).join('');
+    }
+
+    function renderChips(containerId, opcoes, atual, campo) {
+      document.getElementById(containerId).innerHTML = opcoes.map((o) => `
+        <button type="button" class="filter-chip${o.value === atual ? ' is-active' : ''}" onclick="setFiltro('${campo}','${o.value}')">${o.label}</button>
+      `).join('');
+    }
+
+    function setFiltro(campo, valor) {
+      if (campo === 'loja') filtroLoja = valor;
+      if (campo === 'tipo') filtroTipo = valor;
+      if (campo === 'periodo') filtroPeriodo = valor;
+      paginaAtual = 1;
+      renderAll();
+    }
+
+    function getRegistrosFiltrados() {
+      const data = getData();
+      const buscaNorm = busca.trim().toLowerCase();
+      let cutoff = 0;
+      if (filtroPeriodo === 'hoje') { const d = new Date(); d.setHours(0, 0, 0, 0); cutoff = d.getTime(); }
+      else if (filtroPeriodo === '7dias') cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      else if (filtroPeriodo === '30dias') cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      return data.historico.filter((h) => {
+        if (filtroLoja !== 'todas') {
+          const pertence = h.tipo === 'transferencia' ? (h.origemId === filtroLoja || h.destinoId === filtroLoja) : h.lojaId === filtroLoja;
+          if (!pertence) return false;
+        }
+        if (filtroTipo !== 'todos' && h.tipo !== filtroTipo) return false;
+        if (cutoff && h.ts < cutoff) return false;
+
+        if (buscaNorm) {
+          const item = data.itens.find((i) => i.id === h.itemId);
+          const nomeItem = (item ? item.nome : '').toLowerCase();
+          const nomeUsuario = (h.userNome || '').toLowerCase();
+          if (!nomeItem.includes(buscaNorm) && !nomeUsuario.includes(buscaNorm)) return false;
+        }
+        return true;
+      }).sort((a, b) => b.ts - a.ts);
+    }
+
+    function renderTabela() {
+      const data = getData();
+      const registros = getRegistrosFiltrados();
+      const totalPaginas = Math.max(1, Math.ceil(registros.length / PAGE_SIZE));
+      paginaAtual = Math.min(paginaAtual, totalPaginas);
+      const inicio = (paginaAtual - 1) * PAGE_SIZE;
+      const pagina = registros.slice(inicio, inicio + PAGE_SIZE);
+
+      const tbody = document.getElementById('historico-tbody');
+      if (pagina.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><span class="empty-state-icon">${ICONS.historico}</span><div class="empty-state-title">Nenhuma movimentação encontrada</div><div class="empty-state-subtitle">Ajuste os filtros para ver outros resultados.</div></div></td></tr>`;
+      } else {
+        tbody.innerHTML = pagina.map((h) => {
+          const item = data.itens.find((i) => i.id === h.itemId);
+          const badge = TIPO_BADGE[h.tipo];
+          const loja = h.tipo === 'transferencia' ? `${h.origemId} → ${h.destinoId}` : h.lojaId;
+          return `
+            <tr>
+              <td class="td-muted">${fmtDate(h.ts)}</td>
+              <td><span class="badge ${badge.cls}">${badge.label}</span></td>
+              <td class="td-muted">${loja}</td>
+              <td>${item ? item.nome : 'Item removido'}</td>
+              <td class="td-num">${fmt(h.qty)} ${item ? item.un : ''}</td>
+              <td class="td-muted">${h.userNome || '—'}</td>
+              <td class="td-muted">${h.motivo || '—'}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('footer-total').textContent = `${registros.length} ${registros.length === 1 ? 'movimentação' : 'movimentações'}`;
+      document.getElementById('pagination').innerHTML = `
+        <button class="btn btn-ghost btn-sm" ${paginaAtual <= 1 ? 'disabled' : ''} onclick="mudarPagina(-1)">‹ Anterior</button>
+        <span class="text-secondary" style="font-size:var(--fs-12)">Página ${paginaAtual} de ${totalPaginas}</span>
+        <button class="btn btn-ghost btn-sm" ${paginaAtual >= totalPaginas ? 'disabled' : ''} onclick="mudarPagina(1)">Próxima ›</button>
+      `;
+    }
+
+    function mudarPagina(delta) {
+      paginaAtual += delta;
+      renderTabela();
+    }
+
+    function renderAll() {
+      renderLojaTabs();
+      renderChips('tipo-chips', TIPO_OPCOES, filtroTipo, 'tipo');
+      renderChips('periodo-chips', PERIODO_OPCOES, filtroPeriodo, 'periodo');
+      renderTabela();
+    }
+
+    document.getElementById('busca-input').addEventListener('input', (e) => {
+      busca = e.target.value;
+      paginaAtual = 1;
+      renderTabela();
+    });
+
+    document.getElementById('btn-exportar-csv').addEventListener('click', () => {
+      const data = getData();
+      const registros = getRegistrosFiltrados();
+      if (registros.length === 0) { toast('Nenhum registro para exportar.', 'error'); return; }
+
+      const header = ['Data/Hora', 'Tipo', 'Loja', 'Item', 'Quantidade', 'Usuário', 'Motivo'];
+      const rows = registros.map((h) => {
+        const item = data.itens.find((i) => i.id === h.itemId);
+        const loja = h.tipo === 'transferencia' ? `${h.origemId} -> ${h.destinoId}` : h.lojaId;
+        return [
+          fmtDate(h.ts), TIPO_BADGE[h.tipo].label, loja,
+          item ? item.nome : 'Item removido', h.qty, h.userNome || '', h.motivo || '',
+        ];
+      });
+
+      const csv = [header, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `historico_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    initTopbar('historico');
+    document.getElementById('search-icon').innerHTML = ICONS.search;
+    renderAll();
+  </script>
+</body>
+</html>

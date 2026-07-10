@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transferências — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+      background: var(--surface-elevated); border: 1px solid var(--border-strong);
+      border-radius: var(--radius); max-height: 240px; overflow-y: auto; box-shadow: var(--shadow-lg);
+    }
+    .autocomplete-item { padding: 10px 14px; font-size: var(--fs-13); cursor: pointer; }
+    .autocomplete-item:hover { background: var(--hover); }
+    .item-selecionado { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--accent-dim); border: 1px solid rgba(77,184,160,0.3); border-radius: var(--radius); font-size: var(--fs-13); }
+    .preview-estoque { display: flex; gap: 24px; padding: 12px 16px; background: var(--surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius); }
+    .preview-estoque-item { display: flex; flex-direction: column; gap: 2px; }
+    .preview-estoque-label { font-size: var(--fs-11); color: var(--text-muted); text-transform: uppercase; }
+    .preview-estoque-value { font-size: var(--fs-16); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="mb-16">
+        <h1 class="page-title">Transferências</h1>
+        <p class="page-subtitle">Movimente estoque entre lojas</p>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-header"><span class="card-title">Nova transferência</span></div>
+        <div class="card-body flex flex-col gap-16">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="loja-origem">Loja de origem</label>
+              <select class="form-select" id="loja-origem"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="loja-destino">Loja de destino</label>
+              <select class="form-select" id="loja-destino"></select>
+            </div>
+          </div>
+          <div class="form-error" id="loja-alerta" style="display:none">Loja de origem e destino devem ser diferentes.</div>
+
+          <div class="form-group autocomplete-wrap" style="margin-bottom:0" id="busca-wrap">
+            <label class="form-label" for="busca-item">Item</label>
+            <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off">
+            <div class="autocomplete-list" id="autocomplete-list" style="display:none"></div>
+          </div>
+          <div id="item-selecionado-wrap" style="display:none" class="flex flex-col gap-16">
+            <div class="item-selecionado">
+              <span id="item-selecionado-texto"></span>
+              <button class="btn btn-ghost btn-sm" id="btn-trocar-item" type="button">Trocar</button>
+            </div>
+            <div class="preview-estoque" id="preview-estoque"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="qty-input">Quantidade</label>
+              <input class="form-input" type="number" id="qty-input" min="0" step="0.01" value="1">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="responsavel-input">Responsável</label>
+              <input class="form-input" type="text" id="responsavel-input" placeholder="Nome do responsável">
+            </div>
+          </div>
+          <div class="form-error" id="qty-alerta" style="display:none"></div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary btn-md" id="btn-confirmar" type="button" disabled>Confirmar transferência</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Transferências de hoje</span></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Hora</th><th>Item</th><th class="td-num">Qtd</th><th>Rota</th><th>Usuário</th></tr>
+            </thead>
+            <tbody id="transferencias-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let itemSelecionado = null;
+
+    function popularForm() {
+      const opts = LOJAS.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+      const origem = document.getElementById('loja-origem');
+      const destino = document.getElementById('loja-destino');
+      origem.innerHTML = opts;
+      destino.innerHTML = opts;
+      origem.value = getLojaAtiva();
+      destino.value = LOJAS.find((l) => l.id !== origem.value)?.id || LOJAS[0].id;
+
+      const usuario = getUsuarioAtivo();
+      document.getElementById('responsavel-input').value = usuario ? usuario.nome : '';
+    }
+
+    function origemAtual() { return document.getElementById('loja-origem').value; }
+    function destinoAtual() { return document.getElementById('loja-destino').value; }
+
+    document.getElementById('loja-origem').addEventListener('change', () => { atualizarPreview(); validar(); });
+    document.getElementById('loja-destino').addEventListener('change', validar);
+
+    const buscaInput = document.getElementById('busca-item');
+    const listaEl = document.getElementById('autocomplete-list');
+
+    buscaInput.addEventListener('input', () => {
+      const termo = buscaInput.value.trim().toLowerCase();
+      if (!termo) { listaEl.style.display = 'none'; return; }
+
+      const resultados = getData().itens.filter((i) => i.ativo && i.nome.toLowerCase().includes(termo)).slice(0, 8);
+      listaEl.innerHTML = resultados.length === 0
+        ? '<div class="autocomplete-item text-muted">Nenhum item encontrado</div>'
+        : resultados.map((i) => `<div class="autocomplete-item" data-id="${i.id}">${i.nome} (${i.un})</div>`).join('');
+      listaEl.style.display = 'block';
+    });
+
+    listaEl.addEventListener('click', (e) => {
+      const el = e.target.closest('.autocomplete-item[data-id]');
+      if (!el) return;
+      itemSelecionado = getData().itens.find((i) => i.id === el.dataset.id);
+      listaEl.style.display = 'none';
+      buscaInput.value = '';
+      document.getElementById('busca-wrap').style.display = 'none';
+      document.getElementById('item-selecionado-wrap').style.display = '';
+      document.getElementById('item-selecionado-texto').textContent = `${itemSelecionado.nome} (${itemSelecionado.un})`;
+      atualizarPreview();
+      validar();
+    });
+
+    document.getElementById('btn-trocar-item').addEventListener('click', () => {
+      itemSelecionado = null;
+      document.getElementById('busca-wrap').style.display = '';
+      document.getElementById('item-selecionado-wrap').style.display = 'none';
+      validar();
+    });
+
+    function atualizarPreview() {
+      if (!itemSelecionado) return;
+      const box = document.getElementById('preview-estoque');
+      box.innerHTML = `
+        <div class="preview-estoque-item"><span class="preview-estoque-label">Estoque em ${origemAtual()}</span><span class="preview-estoque-value">${fmt(itemSelecionado.qty[origemAtual()] || 0)} ${itemSelecionado.un}</span></div>
+        <div class="preview-estoque-item"><span class="preview-estoque-label">Estoque em ${destinoAtual()}</span><span class="preview-estoque-value">${fmt(itemSelecionado.qty[destinoAtual()] || 0)} ${itemSelecionado.un}</span></div>
+      `;
+    }
+
+    const qtyInput = document.getElementById('qty-input');
+    qtyInput.addEventListener('input', validar);
+    document.getElementById('responsavel-input').addEventListener('input', validar);
+
+    function validar() {
+      const lojaAlerta = document.getElementById('loja-alerta');
+      const qtyAlerta = document.getElementById('qty-alerta');
+      const btn = document.getElementById('btn-confirmar');
+      const mesmaLoja = origemAtual() === destinoAtual();
+      lojaAlerta.style.display = mesmaLoja ? '' : 'none';
+
+      const qty = Number(qtyInput.value) || 0;
+      if (itemSelecionado) {
+        const disponivel = itemSelecionado.qty[origemAtual()] || 0;
+        if (qty > disponivel) {
+          qtyAlerta.textContent = `Quantidade maior que o estoque disponível na origem (${fmt(disponivel)} ${itemSelecionado.un}).`;
+          qtyAlerta.style.display = '';
+          btn.disabled = true;
+          return;
+        }
+      }
+      qtyAlerta.style.display = 'none';
+
+      const responsavel = document.getElementById('responsavel-input').value.trim();
+      btn.disabled = mesmaLoja || !itemSelecionado || !(qty > 0) || !responsavel;
+    }
+
+    document.getElementById('btn-confirmar').addEventListener('click', () => {
+      const usuario = getUsuarioAtivo();
+      const qty = Number(qtyInput.value) || 0;
+      const resultado = registrarTransferencia(origemAtual(), destinoAtual(), itemSelecionado.id, qty, usuario);
+
+      if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
+
+      toast('Transferência registrada com sucesso.', 'success');
+      itemSelecionado = null;
+      document.getElementById('busca-wrap').style.display = '';
+      document.getElementById('item-selecionado-wrap').style.display = 'none';
+      qtyInput.value = 1;
+      validar();
+      renderTransferenciasHoje();
+    });
+
+    function renderTransferenciasHoje() {
+      const inicioHoje = new Date();
+      inicioHoje.setHours(0, 0, 0, 0);
+      const data = getData();
+
+      const registros = data.historico
+        .filter((h) => h.tipo === 'transferencia' && h.ts >= inicioHoje.getTime())
+        .sort((a, b) => b.ts - a.ts);
+
+      const tbody = document.getElementById('transferencias-tbody');
+      if (registros.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><span class="empty-state-icon">${ICONS.transfer}</span><div class="empty-state-title">Nenhuma transferência hoje</div><div class="empty-state-subtitle">As transferências do dia aparecerão aqui.</div></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = registros.map((h) => {
+        const item = data.itens.find((i) => i.id === h.itemId);
+        return `
+          <tr>
+            <td class="td-muted">${fmtDate(h.ts)}</td>
+            <td>${item ? item.nome : 'Item removido'}</td>
+            <td class="td-num">${fmt(h.qty)} ${item ? item.un : ''}</td>
+            <td class="td-muted">${h.origemId} → ${h.destinoId}</td>
+            <td class="td-muted">${h.userNome || '—'}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    initTopbar('transferencias');
+    popularForm();
+    renderTransferenciasHoje();
+  </script>
+</body>
+</html>
