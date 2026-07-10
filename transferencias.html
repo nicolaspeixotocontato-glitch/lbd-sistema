@@ -13,7 +13,8 @@
       border-radius: var(--radius); max-height: 240px; overflow-y: auto; box-shadow: var(--shadow-lg);
     }
     .autocomplete-item { padding: 10px 14px; font-size: var(--fs-13); cursor: pointer; }
-    .autocomplete-item:hover { background: var(--hover); }
+    .autocomplete-item:hover,
+    .autocomplete-item.is-active { background: var(--hover); }
     .item-selecionado { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--accent-dim); border: 1px solid rgba(77,184,160,0.3); border-radius: var(--radius); font-size: var(--fs-13); }
     .preview-estoque { display: flex; gap: 24px; padding: 12px 16px; background: var(--surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius); }
     .preview-estoque-item { display: flex; flex-direction: column; gap: 2px; }
@@ -50,7 +51,10 @@
 
           <div class="form-group autocomplete-wrap" style="margin-bottom:0" id="busca-wrap">
             <label class="form-label" for="busca-item">Item</label>
-            <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off">
+            <div style="position:relative;">
+              <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off" style="width:100%; padding-right:32px;">
+              <button class="input-clear-btn" id="btn-limpar-busca-item" type="button" aria-label="Limpar busca"></button>
+            </div>
             <div class="autocomplete-list" id="autocomplete-list" style="display:none"></div>
           </div>
           <div id="item-selecionado-wrap" style="display:none" class="flex flex-col gap-16">
@@ -73,7 +77,8 @@
           </div>
           <div class="form-error" id="qty-alerta" style="display:none"></div>
         </div>
-        <div class="card-footer">
+        <div class="card-footer flex items-center justify-between">
+          <button class="btn btn-ghost btn-md" id="btn-limpar-formulario" type="button">Limpar formulário</button>
           <button class="btn btn-primary btn-md" id="btn-confirmar" type="button" disabled>Confirmar transferência</button>
         </div>
       </div>
@@ -135,7 +140,13 @@
     listaEl.addEventListener('click', (e) => {
       const el = e.target.closest('.autocomplete-item[data-id]');
       if (!el) return;
-      itemSelecionado = getData().itens.find((i) => i.id === el.dataset.id);
+      selecionarItem(el.dataset.id);
+    });
+
+    initAutocompleteTeclado(buscaInput, listaEl, selecionarItem);
+
+    function selecionarItem(itemId) {
+      itemSelecionado = getData().itens.find((i) => i.id === itemId);
       listaEl.style.display = 'none';
       buscaInput.value = '';
       document.getElementById('busca-wrap').style.display = 'none';
@@ -143,13 +154,14 @@
       document.getElementById('item-selecionado-texto').textContent = `${itemSelecionado.nome} (${itemSelecionado.un})`;
       atualizarPreview();
       validar();
-    });
+    }
 
     document.getElementById('btn-trocar-item').addEventListener('click', () => {
       itemSelecionado = null;
       document.getElementById('busca-wrap').style.display = '';
       document.getElementById('item-selecionado-wrap').style.display = 'none';
       validar();
+      buscaInput.focus();
     });
 
     function atualizarPreview() {
@@ -164,6 +176,20 @@
     const qtyInput = document.getElementById('qty-input');
     qtyInput.addEventListener('input', validar);
     document.getElementById('responsavel-input').addEventListener('input', validar);
+
+    qtyInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const btn = document.getElementById('btn-confirmar');
+      if (!btn.disabled) {
+        btn.click();
+        return;
+      }
+      if (origemAtual() === destinoAtual()) destacarCampoPendente(document.getElementById('loja-destino'));
+      else if (!itemSelecionado) destacarCampoPendente(buscaInput);
+      else if (!document.getElementById('responsavel-input').value.trim()) destacarCampoPendente(document.getElementById('responsavel-input'));
+      else destacarCampoPendente(qtyInput);
+    });
 
     function validar() {
       const lojaAlerta = document.getElementById('loja-alerta');
@@ -202,6 +228,20 @@
       qtyInput.value = 1;
       validar();
       renderTransferenciasHoje();
+      buscaInput.focus();
+    });
+
+    document.getElementById('btn-limpar-formulario').addEventListener('click', () => {
+      itemSelecionado = null;
+      document.getElementById('busca-wrap').style.display = '';
+      document.getElementById('item-selecionado-wrap').style.display = 'none';
+      buscaInput.value = '';
+      document.getElementById('btn-limpar-busca-item').classList.remove('is-visible');
+      listaEl.style.display = 'none';
+      qtyInput.value = 1;
+      validar();
+      buscaInput.focus();
+      toast('Formulário limpo.', 'success');
     });
 
     function renderTransferenciasHoje() {
@@ -234,6 +274,8 @@
     }
 
     initTopbar('transferencias');
+    document.getElementById('btn-limpar-busca-item').innerHTML = ICONS.close;
+    initClearButton('busca-item', 'btn-limpar-busca-item');
     popularForm();
     renderTransferenciasHoje();
   </script>

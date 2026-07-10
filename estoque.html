@@ -56,7 +56,9 @@
             <div class="search-input" style="max-width:300px; flex:1;">
               <span class="search-input-icon" id="search-icon"></span>
               <input type="text" id="busca-input" placeholder="Buscar por nome ou ID...">
+              <button class="input-clear-btn" id="btn-limpar-busca" type="button" aria-label="Limpar busca"></button>
             </div>
+            <button class="btn btn-ghost btn-sm" id="btn-limpar-filtros" type="button">Limpar filtros</button>
           </div>
           <div class="filter-chips" id="categoria-chips"></div>
           <div class="filter-chips" id="status-chips"></div>
@@ -354,6 +356,7 @@
 
     function pintarIconesEstaticos() {
       document.getElementById('search-icon').innerHTML = ICONS.search;
+      document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
       document.getElementById('close-novo-item').innerHTML = ICONS.close;
       document.getElementById('close-editar-item').innerHTML = ICONS.close;
       document.getElementById('btn-novo-item').innerHTML = `${ICONS.plus} Novo item`;
@@ -449,6 +452,23 @@
       renderTabela();
     });
 
+    function getFiltroLojaPadrao() {
+      if (checkPermissao('ver_outras_lojas')) return 'todas';
+      const usuario = getUsuarioAtivo();
+      return usuario ? usuario.loja : 'todas';
+    }
+
+    document.getElementById('btn-limpar-filtros').addEventListener('click', () => {
+      filtroLoja = getFiltroLojaPadrao();
+      filtroCategoria = 'todas';
+      filtroStatus = 'todos';
+      buscaTexto = '';
+      document.getElementById('busca-input').value = '';
+      document.getElementById('btn-limpar-busca').classList.remove('is-visible');
+      renderAll();
+      toast('Filtros limpos.', 'success');
+    });
+
     document.getElementById('form-novo-item').addEventListener('submit', (e) => {
       e.preventDefault();
       if (!checkPermissao('editar_estoque')) return;
@@ -542,12 +562,10 @@
     }
 
     initTopbar('estoque');
-    if (!checkPermissao('ver_outras_lojas')) {
-      const usuario = getUsuarioAtivo();
-      if (usuario) filtroLoja = usuario.loja;
-    }
+    filtroLoja = getFiltroLojaPadrao();
     popularSelectsCategoria();
     pintarIconesEstaticos();
+    initClearButton('busca-input', 'btn-limpar-busca');
     renderAll();
   </script>
 </body>

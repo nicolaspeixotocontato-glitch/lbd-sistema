@@ -245,7 +245,8 @@
             </table>
           </div>
         </div>
-        <div class="card-footer">
+        <div class="card-footer flex items-center justify-between">
+          <button class="btn btn-ghost btn-md" id="btn-limpar-manual" type="button">Limpar formulário</button>
           <button class="btn btn-primary btn-md" id="btn-revisar-manual" type="button">Revisar nota</button>
         </div>
       </div>
@@ -509,6 +510,24 @@
       manualItens.push({ item: item.nome, un: item.un, qtd_recebida: qty, precoUnit: item.precoUnit });
       renderManualItens();
       document.getElementById('manual-item-qty').value = 1;
+      document.getElementById('manual-item-select').focus();
+    });
+
+    document.getElementById('manual-item-qty').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const itemId = document.getElementById('manual-item-select').value;
+      const qty = Number(document.getElementById('manual-item-qty').value) || 0;
+
+      if (!itemId) { destacarCampoPendente(document.getElementById('manual-item-select')); return; }
+      if (qty <= 0) { destacarCampoPendente(document.getElementById('manual-item-qty')); return; }
+
+      document.getElementById('btn-adicionar-item-manual').click();
+    });
+
+    document.getElementById('btn-limpar-manual').addEventListener('click', () => {
+      resetManualForm();
+      toast('Formulário limpo.', 'success');
     });
 
     document.getElementById('btn-revisar-manual').addEventListener('click', () => {

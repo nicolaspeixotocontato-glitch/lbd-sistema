@@ -13,7 +13,8 @@
       border-radius: var(--radius); max-height: 240px; overflow-y: auto; box-shadow: var(--shadow-lg);
     }
     .autocomplete-item { padding: 10px 14px; font-size: var(--fs-13); cursor: pointer; }
-    .autocomplete-item:hover { background: var(--hover); }
+    .autocomplete-item:hover,
+    .autocomplete-item.is-active { background: var(--hover); }
     .item-selecionado { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--accent-dim); border: 1px solid rgba(77,184,160,0.3); border-radius: var(--radius); font-size: var(--fs-13); }
     .qty-controls { display: flex; align-items: center; gap: 8px; }
     .qty-controls input { max-width: 100px; text-align: center; }
@@ -52,7 +53,10 @@
           <div class="form-group autocomplete-wrap" style="margin-bottom:0" id="busca-wrap">
             <label class="form-label" for="busca-item">Item</label>
             <div class="flex gap-8">
-              <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off" style="flex:1">
+              <div style="position:relative; flex:1;">
+                <input class="form-input" type="text" id="busca-item" placeholder="Buscar item por nome..." autocomplete="off" style="width:100%; padding-right:32px;">
+                <button class="input-clear-btn" id="btn-limpar-busca-item" type="button" aria-label="Limpar busca"></button>
+              </div>
               <button class="btn btn-secondary btn-md" id="btn-escanear" type="button">
                 <span id="icone-escanear"></span> Escanear item
               </button>
@@ -82,7 +86,8 @@
           </div>
           <div class="form-error" id="qty-alerta" style="display:none"></div>
         </div>
-        <div class="card-footer">
+        <div class="card-footer flex items-center justify-between">
+          <button class="btn btn-ghost btn-md" id="btn-limpar-formulario" type="button">Limpar formulário</button>
           <button class="btn btn-primary btn-md" id="btn-confirmar-saida" type="button" disabled>Confirmar saída</button>
         </div>
       </div>
@@ -148,6 +153,8 @@
       selecionarItem(el.dataset.id);
     });
 
+    initAutocompleteTeclado(buscaInput, listaEl, selecionarItem);
+
     function selecionarItem(itemId) {
       itemSelecionado = getData().itens.find((i) => i.id === itemId);
       listaEl.style.display = 'none';
@@ -164,6 +171,7 @@
       document.getElementById('busca-wrap').style.display = '';
       document.getElementById('item-selecionado-wrap').style.display = 'none';
       validarQuantidade();
+      buscaInput.focus();
     });
 
     document.getElementById('sessao-loja').addEventListener('change', () => {
@@ -182,6 +190,19 @@
     });
     qtyInput.addEventListener('input', validarQuantidade);
     document.getElementById('motivo-select').addEventListener('change', validarQuantidade);
+
+    qtyInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const btn = document.getElementById('btn-confirmar-saida');
+      if (!btn.disabled) {
+        btn.click();
+        return;
+      }
+      if (!itemSelecionado) destacarCampoPendente(buscaInput);
+      else if (!document.getElementById('motivo-select').value) destacarCampoPendente(document.getElementById('motivo-select'));
+      else destacarCampoPendente(qtyInput);
+    });
 
     function validarQuantidade() {
       const alerta = document.getElementById('qty-alerta');
@@ -220,8 +241,23 @@
       document.getElementById('busca-wrap').style.display = '';
       document.getElementById('item-selecionado-wrap').style.display = 'none';
       qtyInput.value = 1;
+      // Motivo permanece selecionado — agiliza saídas consecutivas com o mesmo motivo.
+      validarQuantidade();
+      buscaInput.focus();
+    });
+
+    document.getElementById('btn-limpar-formulario').addEventListener('click', () => {
+      itemSelecionado = null;
+      document.getElementById('busca-wrap').style.display = '';
+      document.getElementById('item-selecionado-wrap').style.display = 'none';
+      buscaInput.value = '';
+      document.getElementById('btn-limpar-busca-item').classList.remove('is-visible');
+      listaEl.style.display = 'none';
+      qtyInput.value = 1;
       document.getElementById('motivo-select').value = '';
       validarQuantidade();
+      buscaInput.focus();
+      toast('Formulário limpo.', 'success');
     });
 
     function renderRetiradas() {
@@ -255,6 +291,8 @@
 
     initTopbar('saidas');
     document.getElementById('icone-escanear').innerHTML = ICONS.camera;
+    document.getElementById('btn-limpar-busca-item').innerHTML = ICONS.close;
+    initClearButton('busca-item', 'btn-limpar-busca-item');
     popularSessao();
     renderRetiradas();
   </script>

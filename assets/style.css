@@ -894,6 +894,11 @@ table {
   color: var(--danger);
 }
 
+.field-pendente {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px var(--danger-dim) !important;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1200,13 +1205,49 @@ table {
 .search-input input {
   width: 100%;
   height: 38px;
-  padding: 0 14px 0 40px;
+  padding: 0 36px 0 40px;
   background: var(--surface-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   color: var(--text-primary);
   font-size: var(--fs-13);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* ==========================================================================
+   Input Clear Button (botão "×" para limpar campos de busca)
+   ========================================================================== */
+
+.input-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.input-clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.input-clear-btn:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.input-clear-btn.is-visible {
+  display: flex;
 }
 
 .search-input input::placeholder {

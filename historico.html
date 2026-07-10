@@ -29,7 +29,9 @@
             <div class="search-input" style="max-width:280px; flex:1;">
               <span class="search-input-icon" id="search-icon"></span>
               <input type="text" id="busca-input" placeholder="Buscar por item ou usuário...">
+              <button class="input-clear-btn" id="btn-limpar-busca" type="button" aria-label="Limpar busca"></button>
             </div>
+            <button class="btn btn-ghost btn-sm" id="btn-limpar-filtros" type="button">Limpar filtros</button>
           </div>
           <div class="filter-chips" id="tipo-chips"></div>
           <div class="filter-chips" id="periodo-chips"></div>
@@ -193,6 +195,24 @@
       renderTabela();
     });
 
+    function getFiltroLojaPadrao() {
+      if (checkPermissao('ver_outras_lojas')) return 'todas';
+      const usuario = getUsuarioAtivo();
+      return usuario ? usuario.loja : 'todas';
+    }
+
+    document.getElementById('btn-limpar-filtros').addEventListener('click', () => {
+      filtroLoja = getFiltroLojaPadrao();
+      filtroTipo = 'todos';
+      filtroPeriodo = 'todos';
+      busca = '';
+      paginaAtual = 1;
+      document.getElementById('busca-input').value = '';
+      document.getElementById('btn-limpar-busca').classList.remove('is-visible');
+      renderAll();
+      toast('Filtros limpos.', 'success');
+    });
+
     document.getElementById('btn-exportar-csv').addEventListener('click', () => {
       if (!checkPermissao('exportar_dados')) { toast('Você não tem permissão para exportar dados.', 'error'); return; }
       const data = getData();
@@ -222,14 +242,13 @@
     });
 
     initTopbar('historico');
-    if (!checkPermissao('ver_outras_lojas')) {
-      const usuario = getUsuarioAtivo();
-      if (usuario) filtroLoja = usuario.loja;
-    }
+    filtroLoja = getFiltroLojaPadrao();
     if (!checkPermissao('exportar_dados')) {
       document.getElementById('btn-exportar-csv').style.display = 'none';
     }
     document.getElementById('search-icon').innerHTML = ICONS.search;
+    document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
+    initClearButton('busca-input', 'btn-limpar-busca');
     renderAll();
   </script>
 </body>

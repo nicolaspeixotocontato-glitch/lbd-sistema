@@ -52,6 +52,8 @@
         </div>
       </div>
 
+      <div class="flex gap-8 mb-16" id="atalhos-rapidos" style="flex-wrap:wrap;"></div>
+
       <div class="loja-tabs mb-16" id="loja-tabs"></div>
 
       <div class="stat-grid mb-16" id="stat-grid"></div>
@@ -104,6 +106,21 @@
   <script src="assets/app.js"></script>
   <script>
     let filtroLoja = 'todas';
+
+    const ATALHOS_PAINEL = [
+      { label: 'Nova entrada', href: 'entradas.html', icon: 'entradas', acao: 'ver_entradas' },
+      { label: 'Nova saída', href: 'saidas.html', icon: 'saidas', acao: 'ver_saidas' },
+      { label: 'Transferência', href: 'transferencias.html', icon: 'transfer', acao: 'ver_transferencias' },
+      { label: 'Estoque', href: 'estoque.html', icon: 'estoque', acao: 'ver_estoque' },
+      { label: 'Pedidos', href: 'pedidos.html', icon: 'pedidos', acao: 'ver_pedidos' },
+    ];
+
+    function renderAtalhosRapidos() {
+      document.getElementById('atalhos-rapidos').innerHTML = ATALHOS_PAINEL
+        .filter((a) => checkPermissao(a.acao))
+        .map((a) => `<a class="btn btn-secondary btn-md" href="${a.href}">${ICONS[a.icon]} ${a.label}</a>`)
+        .join('');
+    }
 
     function getScopeLojas() {
       return filtroLoja === 'todas' ? LOJAS.map((l) => l.id) : [filtroLoja];
@@ -346,6 +363,7 @@
       const usuario = getUsuarioAtivo();
       if (usuario) filtroLoja = usuario.loja;
     }
+    renderAtalhosRapidos();
     renderAll();
   </script>
 </body>

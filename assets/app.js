@@ -512,6 +512,70 @@ function toast(msg, tipo = 'default', duracao = 3000) {
   }, duracao);
 }
 
+function destacarCampoPendente(el) {
+  if (!el) return;
+  el.focus();
+  if (el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('field-pendente');
+  setTimeout(() => el.classList.remove('field-pendente'), 1500);
+}
+
+function initClearButton(inputId, btnId) {
+  const input = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  if (!input || !btn) return;
+
+  const atualizar = () => btn.classList.toggle('is-visible', input.value.length > 0);
+  input.addEventListener('input', atualizar);
+  btn.addEventListener('click', () => {
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
+  atualizar();
+}
+
+function initAutocompleteTeclado(inputEl, listaEl, onSelecionar) {
+  let indiceAtivo = -1;
+
+  const getItens = () => Array.from(listaEl.querySelectorAll('.autocomplete-item[data-id]'));
+
+  const destacar = (idx) => {
+    const itens = getItens();
+    itens.forEach((it, i) => it.classList.toggle('is-active', i === idx));
+    if (idx >= 0 && itens[idx]) itens[idx].scrollIntoView({ block: 'nearest' });
+  };
+
+  inputEl.addEventListener('input', () => { indiceAtivo = -1; });
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (listaEl.style.display === 'none') return;
+    const itens = getItens();
+    if (itens.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      indiceAtivo = (indiceAtivo + 1) % itens.length;
+      destacar(indiceAtivo);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      indiceAtivo = indiceAtivo <= 0 ? itens.length - 1 : indiceAtivo - 1;
+      destacar(indiceAtivo);
+    } else if (e.key === 'Enter') {
+      const alvo = indiceAtivo >= 0 ? indiceAtivo : 0;
+      if (itens[alvo]) {
+        e.preventDefault();
+        indiceAtivo = -1;
+        onSelecionar(itens[alvo].dataset.id);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      listaEl.style.display = 'none';
+      indiceAtivo = -1;
+    }
+  });
+}
+
 function openModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
