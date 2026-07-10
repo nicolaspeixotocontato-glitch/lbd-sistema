@@ -168,10 +168,32 @@ function getData() {
   const raw = localStorage.getItem(STORAGE_KEY_DATA);
   if (!raw) {
     const inicial = JSON.parse(JSON.stringify(DADOS_INICIAIS));
+    inicial.fornecedores = JSON.parse(JSON.stringify(FORNECEDORES));
     localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(inicial));
     return inicial;
   }
-  return JSON.parse(raw);
+
+  const data = JSON.parse(raw);
+  let migrado = false;
+
+  if (!data.fornecedores || data.fornecedores.length === 0) {
+    data.fornecedores = JSON.parse(JSON.stringify(FORNECEDORES));
+    migrado = true;
+  }
+
+  data.itens.forEach((item) => {
+    if (!item.fornecedorId) {
+      const original = DADOS_INICIAIS.itens.find((i) => i.id === item.id);
+      if (original && original.fornecedorId) {
+        item.fornecedorId = original.fornecedorId;
+        migrado = true;
+      }
+    }
+  });
+
+  if (migrado) saveData(data);
+
+  return data;
 }
 
 function saveData(data) {
