@@ -1,0 +1,91 @@
+{
+  "updated": "13/07/2026",
+  "progressPercent": 40,
+  "phases": [
+    {
+      "num": 1,
+      "title": "Fornecedores reais + renomear LBD02",
+      "status": "ok",
+      "desc": "Substituição do catálogo fictício de fornecedores pelos 21 fornecedores reais da operação. LBD02 passou a se chamar \"LBD02 – Nonoai\".",
+      "details": [
+        "Confirmado por Nicolas — alteração já executada e aceita.",
+        "Fornecedores reais: ceasa, pamplona, msx, dellys, kem, atacado, novomix, senar, frumar, gcn, divine, duplex, embnascimento, jbembalagens, queijoecia, triangulo, fruki, teresa, fensa, americanas, samsclub."
+      ],
+      "pills": []
+    },
+    {
+      "num": 2,
+      "title": "Catálogo real de itens (153 itens)",
+      "status": "ok",
+      "desc": "Substituição do catálogo fictício de 30 itens de teste pelos 153 itens reais extraídos das planilhas de estoque e pedidos, com categorias específicas por produto.",
+      "details": [
+        "Dados extraídos de CONTROLE_DE_ESTOQUE_LBD.xlsx e PEDIDOS_LBD.xlsx, revisados junto com Nicolas.",
+        "Categorização refeita: 14 categorias específicas por produto.",
+        "Migração de dados preserva o histórico — itens fictícios antigos desativados, não apagados.",
+        "Validado em produção via console: 153 itens ativos, 30 desativados, catalogoVersion 2.",
+        "Correção pontual aplicada: Abacaxi e Figo movidos para 'Molhos e Conservas' (são enlatados), bandeja de ovos de 20un removida (duplicada, só a de 30un é usada)."
+      ],
+      "pills": ["153 itens ativos", "14 categorias", "30 desativados (histórico preservado)"]
+    },
+    {
+      "num": 3,
+      "title": "Contagem física + CMV real",
+      "status": "pending",
+      "desc": "Checklist impresso por loja, ajuste de estoque pós-contagem (positivo/negativo) e cálculo de CMV real seguindo o método já usado por Nicolas.",
+      "details": [
+        "Contagem simplificada todo domingo (para pedidos semanais).",
+        "Contagem geral completa todo dia 1º do mês.",
+        "Ajuste positivo quando sobra estoque físico; negativo quando falta.",
+        "Próxima fase a iniciar."
+      ],
+      "pills": []
+    },
+    {
+      "num": 4,
+      "title": "Ajuste manual de pedidos",
+      "status": "pending",
+      "desc": "Permitir ajustar manualmente a quantidade sugerida automaticamente pelo sistema, para cobrir datas sazonais com demanda maior.",
+      "details": [
+        "Necessidade confirmada por Nicolas como funcionalidade essencial.",
+        "Depende da conclusão da Fase 3."
+      ],
+      "pills": []
+    },
+    {
+      "num": 5,
+      "title": "Fluxos especiais (Duplex / Divine / Câmara Fria)",
+      "status": "dropped",
+      "desc": "Fluxos específicos por NF para fornecedores de caixas e chocolate, e controle compartilhado de estoque de mussarela entre lojas.",
+      "details": [
+        "Nicolas confirmou: \"abas da planilha que praticamente não são utilizadas\" — nenhuma ação necessária."
+      ],
+      "pills": []
+    }
+  ],
+  "findings": [
+    {
+      "title": "Revisão de documentação executiva",
+      "text": "Bloqueada — acesso ao repositório (git/GitHub) retornando erro 403 nesta sessão. Aguardando Nicolas restaurar acesso ou colar o conteúdo dos arquivos diretamente."
+    },
+    {
+      "title": "Teste de UX real (mobile/navegador)",
+      "text": "Concluído. Principais atritos: LBD03 (loja ainda não aberta) poluindo estatísticas do Painel; filtro de categorias do Estoque possivelmente denso no mobile; \"Novo item\" sem campo de fornecedor."
+    },
+    {
+      "title": "Entradas — comportamento padrão",
+      "text": "Abre por padrão na aba paga \"Cupom por foto (IA)\" em vez da gratuita \"Nota manual\"; fornecedor em Entradas é texto livre, desconectado da lista fixa usada em Pedidos."
+    },
+    {
+      "title": "Outros achados de UX",
+      "text": "Gap de altura no sidebar em páginas longas (padrão já existente); dropdown de login expõe todos os usernames válidos."
+    }
+  ],
+  "milestones": [
+    { "text": "Execução e push da Fase 2 confirmados e validados em produção.", "status": "done" },
+    { "text": "Correção de categorias (Abacaxi/Figo) e remoção de item duplicado (bandeja de ovos 20un) enviada ao Claude Code.", "status": "next" },
+    { "text": "Validar em Pedidos: agregação \"Por fornecedor\" batendo com a lista real de fornecedores.", "status": "pending" },
+    { "text": "Iniciar Fase 3 — contagem física + CMV real.", "status": "pending" },
+    { "text": "Iniciar Fase 4 — ajuste manual de pedidos.", "status": "pending" },
+    { "text": "Retomar revisão da documentação executiva assim que o acesso ao repositório for resolvido.", "status": "pending" }
+  ]
+}
