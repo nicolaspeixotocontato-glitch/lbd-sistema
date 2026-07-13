@@ -6,66 +6,6 @@
   <title>Entradas — La Bella Donna</title>
   <link rel="stylesheet" href="assets/style.css">
   <style>
-    .dropzone {
-      border: 2px dashed var(--border-strong);
-      border-radius: var(--radius-lg);
-      padding: 40px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color var(--transition-fast), background var(--transition-fast);
-    }
-
-    .dropzone:hover,
-    .dropzone.is-dragover {
-      border-color: var(--accent);
-      background: var(--accent-dim);
-    }
-
-    .dropzone-icon svg {
-      width: 32px;
-      height: 32px;
-      color: var(--text-muted);
-      margin: 0 auto 12px;
-    }
-
-    .dropzone-title {
-      font-size: var(--fs-14);
-      font-weight: 500;
-      color: var(--text-primary);
-    }
-
-    .dropzone-subtitle {
-      font-size: var(--fs-12);
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .preview-wrap {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-
-    .preview-box img {
-      max-width: 220px;
-      max-height: 220px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border-subtle);
-      display: block;
-    }
-
-    .preview-box-pdf {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 16px;
-      background: var(--surface-elevated);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius);
-      font-size: var(--fs-13);
-    }
-
     .resumo-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -121,25 +61,6 @@
       font-size: var(--fs-13);
       color: var(--text-primary);
     }
-
-    .api-key-status {
-      font-size: var(--fs-11);
-      color: var(--text-muted);
-    }
-
-    .api-key-status.is-ok {
-      color: var(--success);
-    }
-
-    .btn-api-key-corner {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 40;
-      background: var(--surface-elevated);
-      border: 1px solid var(--border-strong);
-      box-shadow: var(--shadow-lg);
-    }
   </style>
 </head>
 <body>
@@ -152,14 +73,13 @@
       <div class="flex items-center justify-between mb-16" style="flex-wrap:wrap; gap:12px;">
         <div>
           <h1 class="page-title">Entradas</h1>
-          <p class="page-subtitle">Registre a entrada de mercadorias via cupom fiscal ou nota manual</p>
+          <p class="page-subtitle">Registre a entrada de mercadorias via nota manual</p>
         </div>
       </div>
 
       <div class="card mb-16">
-        <div class="card-header flex items-center justify-between">
+        <div class="card-header">
           <span class="card-title">Configuração da sessão</span>
-          <span class="api-key-status" id="api-key-status"></span>
         </div>
         <div class="card-body">
           <div class="form-row">
@@ -175,33 +95,7 @@
         </div>
       </div>
 
-      <div class="loja-tabs mb-16" id="modo-tabs">
-        <button type="button" class="loja-tab is-active" id="tab-cupom-ia">Cupom por foto (IA)</button>
-        <button type="button" class="loja-tab" id="tab-nota-manual">Nota manual</button>
-      </div>
-
-      <div class="card mb-16" id="upload-card">
-        <div class="card-header">
-          <span class="card-title">Cupom fiscal</span>
-        </div>
-        <div class="card-body">
-          <div class="dropzone" id="dropzone">
-            <div class="dropzone-icon" id="dropzone-icon"></div>
-            <div class="dropzone-title">Arraste a imagem ou PDF do cupom aqui</div>
-            <div class="dropzone-subtitle">ou clique para selecionar um arquivo (câmera ou galeria)</div>
-            <input type="file" id="file-input" accept="image/*,application/pdf" class="visually-hidden">
-          </div>
-          <div class="preview-wrap" id="preview-wrap" style="display:none">
-            <div class="preview-box" id="preview-box"></div>
-            <button class="btn btn-ghost btn-sm" id="btn-remover-arquivo" type="button">Remover</button>
-          </div>
-        </div>
-        <div class="card-footer" id="upload-footer" style="display:none">
-          <button class="btn btn-primary btn-md" id="btn-extrair" type="button">Extrair dados do cupom</button>
-        </div>
-      </div>
-
-      <div class="card mb-16" id="manual-card" style="display:none">
+      <div class="card mb-16" id="manual-card">
         <div class="card-header"><span class="card-title">Nota manual</span></div>
         <div class="card-body flex flex-col gap-16">
           <div class="form-row">
@@ -253,7 +147,7 @@
 
       <div class="card mb-16" id="resultado-card" style="display:none">
         <div class="card-header">
-          <span class="card-title" id="resultado-card-title">Resultado da extração</span>
+          <span class="card-title" id="resultado-card-title">Itens da nota manual</span>
         </div>
         <div class="card-body flex flex-col gap-16">
           <div class="resumo-grid" id="resumo-nota"></div>
@@ -307,33 +201,6 @@
     </main>
   </div>
 
-  <button class="btn btn-ghost btn-sm btn-api-key-corner" id="btn-config-api-corner" type="button">⚙ API Key</button>
-
-  <!-- Modal: Configurar API Key -->
-  <div class="modal-backdrop" id="modal-api-key" style="display:none">
-    <div class="modal" style="max-width:420px">
-      <div class="modal-header">
-        <span class="modal-title">Configurar API Key da Anthropic</span>
-        <button class="modal-close" type="button" aria-label="Fechar" onclick="closeModal('modal-api-key')" id="close-api-key"></button>
-      </div>
-      <form id="form-api-key">
-        <div class="modal-body flex flex-col gap-16">
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label" for="input-api-key">Chave (sk-ant-...)</label>
-            <input class="form-input" type="password" id="input-api-key" autocomplete="off" placeholder="sk-ant-api03-...">
-            <div class="form-hint">
-              Fica salva apenas no localStorage deste navegador — nunca é enviada para o repositório. Qualquer pessoa com acesso a este navegador pode visualizá-la pelo DevTools.
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-ghost btn-md" type="button" onclick="closeModal('modal-api-key')">Cancelar</button>
-          <button class="btn btn-primary btn-md" type="submit">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- Modal: Confirmar match de itens -->
   <div class="modal-backdrop" id="modal-match" style="display:none">
     <div class="modal" style="max-width:640px">
@@ -343,7 +210,7 @@
       </div>
       <div class="modal-body">
         <p class="text-secondary mb-16" style="font-size:var(--fs-12)">
-          Revise a sugestão de correspondência para cada item do cupom. Selecione "— Não corresponde —" para ignorar um item.
+          Revise a sugestão de correspondência para cada item da nota. Selecione "— Não corresponde —" para ignorar um item.
         </p>
         <div id="match-rows"></div>
       </div>
@@ -358,28 +225,9 @@
   <script src="assets/jsQR.js"></script>
   <script src="assets/app.js"></script>
   <script>
-    const API_KEY_STORAGE = 'lbd_api_key';
-    const API_KEY_PROMPTED_STORAGE = 'lbd_api_key_prompted';
-
-    let arquivoAtual = null;
     let resultadoExtracao = null;
     let notasSessao = [];
     let manualItens = [];
-
-    function getApiKey() {
-      return localStorage.getItem(API_KEY_STORAGE) || '';
-    }
-
-    function setApiKey(key) {
-      localStorage.setItem(API_KEY_STORAGE, key);
-    }
-
-    function renderApiKeyStatus() {
-      const el = document.getElementById('api-key-status');
-      const ok = !!getApiKey();
-      el.textContent = ok ? 'Chave configurada ✓' : 'Chave não configurada';
-      el.classList.toggle('is-ok', ok);
-    }
 
     function normalizarTexto(s) {
       const str = (s || '').toString().toLowerCase().normalize('NFD');
@@ -445,20 +293,6 @@
       const usuario = getUsuarioAtivo();
       return usuario ? usuario.nome : '—';
     }
-
-    /* ---------- Modo de entrada (cupom IA x nota manual) ---------- */
-
-    function setModoEntrada(modo) {
-      const isManual = modo === 'manual';
-      document.getElementById('tab-cupom-ia').classList.toggle('is-active', !isManual);
-      document.getElementById('tab-nota-manual').classList.toggle('is-active', isManual);
-      document.getElementById('upload-card').style.display = isManual ? 'none' : '';
-      document.getElementById('manual-card').style.display = isManual ? '' : 'none';
-      document.getElementById('resultado-card').style.display = 'none';
-    }
-
-    document.getElementById('tab-cupom-ia').addEventListener('click', () => setModoEntrada('cupom'));
-    document.getElementById('tab-nota-manual').addEventListener('click', () => setModoEntrada('manual'));
 
     function popularSelectItemManual() {
       const select = document.getElementById('manual-item-select');
@@ -562,215 +396,9 @@
       renderManualItens();
     }
 
-    /* ---------- Upload / preview ---------- */
-
     function pintarIconesEstaticos() {
-      document.getElementById('dropzone-icon').innerHTML = ICONS['arrow-up'];
-      document.getElementById('close-api-key').innerHTML = ICONS.close;
       document.getElementById('close-match').innerHTML = ICONS.close;
     }
-
-    function handleArquivoSelecionado(file) {
-      if (!file) return;
-
-      const isPdf = file.type === 'application/pdf';
-      const isImage = file.type.startsWith('image/');
-
-      if (!isPdf && !isImage) {
-        toast('Formato não suportado. Envie uma imagem ou PDF.', 'error');
-        return;
-      }
-
-      if (file.size > 15 * 1024 * 1024) {
-        toast('Arquivo muito grande (máx. 15MB).', 'error');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1];
-        if (arquivoAtual?.previewUrl) URL.revokeObjectURL(arquivoAtual.previewUrl);
-
-        arquivoAtual = {
-          file,
-          base64,
-          mediaType: file.type,
-          isPdf,
-          previewUrl: isImage ? URL.createObjectURL(file) : null,
-        };
-
-        renderPreview();
-      };
-      reader.onerror = () => toast('Não foi possível ler o arquivo.', 'error');
-      reader.readAsDataURL(file);
-    }
-
-    function renderPreview() {
-      document.getElementById('dropzone').style.display = 'none';
-      const wrap = document.getElementById('preview-wrap');
-      wrap.style.display = 'flex';
-
-      const box = document.getElementById('preview-box');
-      if (arquivoAtual.isPdf) {
-        box.innerHTML = `
-          <div class="preview-box-pdf">
-            <strong>PDF</strong>
-            <span>${arquivoAtual.file.name}</span>
-            <span class="text-muted">(${(arquivoAtual.file.size / 1024).toFixed(0)} KB)</span>
-          </div>
-        `;
-      } else {
-        box.innerHTML = `<img src="${arquivoAtual.previewUrl}" alt="Preview do cupom">`;
-      }
-
-      document.getElementById('upload-footer').style.display = 'flex';
-    }
-
-    function removerArquivo() {
-      if (arquivoAtual?.previewUrl) URL.revokeObjectURL(arquivoAtual.previewUrl);
-      arquivoAtual = null;
-      resultadoExtracao = null;
-
-      document.getElementById('dropzone').style.display = '';
-      document.getElementById('preview-wrap').style.display = 'none';
-      document.getElementById('upload-footer').style.display = 'none';
-      document.getElementById('resultado-card').style.display = 'none';
-      document.getElementById('file-input').value = '';
-    }
-
-    const dropzone = document.getElementById('dropzone');
-    dropzone.addEventListener('click', () => document.getElementById('file-input').click());
-    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('is-dragover'); });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragover'));
-    dropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropzone.classList.remove('is-dragover');
-      handleArquivoSelecionado(e.dataTransfer.files[0]);
-    });
-
-    document.getElementById('file-input').addEventListener('change', (e) => {
-      handleArquivoSelecionado(e.target.files[0]);
-    });
-
-    document.getElementById('btn-remover-arquivo').addEventListener('click', removerArquivo);
-
-    /* ---------- Extração via Anthropic API ---------- */
-
-    const SYSTEM_PROMPT_EXTRACAO = `Você é um assistente especializado em extrair dados de cupons fiscais e notas fiscais brasileiras (NF-e, NFC-e, cupom fiscal, nota de fornecedor) a partir de fotos ou PDFs.
-
-Analise cuidadosamente o documento fornecido e extraia:
-- fornecedor: razão social ou nome fantasia do emitente
-- data: data de emissão no formato DD/MM/AAAA
-- nf: número da nota fiscal ou cupom (apenas os dígitos/série, sem prefixos como "Nº")
-- total: valor total da nota, como número (ponto decimal, sem separador de milhar, sem "R$")
-- itens: lista de itens comprados, cada um com:
-  - item: descrição do produto como aparece na nota (pode simplificar abreviações óbvias)
-  - un: unidade de medida mais provável (kg, un, L, cx, pct, g, ml) inferida pelo contexto do item
-  - qtd_recebida: quantidade, como number
-
-Regras importantes:
-- Se um campo não estiver legível ou não existir, use null (nunca invente valores)
-- Números sempre como number JSON, nunca como string
-- Retorne APENAS um objeto JSON válido, sem texto antes ou depois, sem blocos de código markdown, exatamente neste formato:
-{"fornecedor": string|null, "data": string|null, "nf": string|null, "total": number|null, "itens": [{"item": string, "un": string|null, "qtd_recebida": number}]}`;
-
-    function extrairJsonDaResposta(texto) {
-      const limpo = texto.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-      return JSON.parse(limpo);
-    }
-
-    async function chamarAnthropicExtrairCupom() {
-      const apiKey = getApiKey();
-      if (!apiKey) {
-        throw new Error('SEM_API_KEY');
-      }
-
-      const contentBlock = arquivoAtual.isPdf
-        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: arquivoAtual.base64 } }
-        : { type: 'image', source: { type: 'base64', media_type: arquivoAtual.mediaType, data: arquivoAtual.base64 } };
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 4096,
-          system: SYSTEM_PROMPT_EXTRACAO,
-          messages: [{
-            role: 'user',
-            content: [contentBlock, { type: 'text', text: 'Extraia os dados estruturados deste cupom/nota fiscal.' }],
-          }],
-        }),
-      });
-
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => null);
-        throw new Error(errBody?.error?.message || `Erro da API (${response.status}).`);
-      }
-
-      const data = await response.json();
-
-      if (data.stop_reason === 'refusal') {
-        throw new Error('A IA recusou processar este documento.');
-      }
-
-      const textBlock = (data.content || []).find((b) => b.type === 'text');
-      if (!textBlock) {
-        throw new Error('A resposta da IA não trouxe conteúdo de texto.');
-      }
-
-      let json;
-      try {
-        json = extrairJsonDaResposta(textBlock.text);
-      } catch (e) {
-        throw new Error('Não foi possível interpretar o JSON retornado pela IA.');
-      }
-
-      json.itens = Array.isArray(json.itens) ? json.itens : [];
-      json.total = Number(json.total) || 0;
-      json.itens = json.itens.map((it) => ({
-        item: it.item || 'Item sem nome',
-        un: it.un || null,
-        qtd_recebida: Number(it.qtd_recebida) || 0,
-      }));
-
-      return json;
-    }
-
-    document.getElementById('btn-extrair').addEventListener('click', async () => {
-      if (!getApiKey()) {
-        toast('Configure sua API Key da Anthropic antes de extrair um cupom.', 'error');
-        abrirModalApiKey();
-        return;
-      }
-
-      const btn = document.getElementById('btn-extrair');
-      const textoOriginal = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Extraindo...';
-
-      try {
-        resultadoExtracao = await chamarAnthropicExtrairCupom();
-        document.getElementById('resultado-card-title').textContent = 'Resultado da extração';
-        renderResultado();
-        toast('Dados extraídos com sucesso.', 'success');
-      } catch (e) {
-        if (e.message === 'SEM_API_KEY') {
-          toast('Configure sua API Key da Anthropic antes de extrair um cupom.', 'error');
-          abrirModalApiKey();
-        } else {
-          toast(e.message, 'error');
-        }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = textoOriginal;
-      }
-    });
 
     function renderResultado() {
       const r = resultadoExtracao;
@@ -823,7 +451,8 @@ Regras importantes:
 
       notasSessao.unshift(nota);
       renderNotasSessao();
-      removerArquivo();
+      resultadoExtracao = null;
+      document.getElementById('resultado-card').style.display = 'none';
       resetManualForm();
     }
 
@@ -910,7 +539,7 @@ Regras importantes:
               <div class="empty-state">
                 <span class="empty-state-icon">${ICONS.entradas}</span>
                 <div class="empty-state-title">Nenhuma nota nesta sessão</div>
-                <div class="empty-state-subtitle">Extraia um cupom acima para começar.</div>
+                <div class="empty-state-subtitle">Preencha a nota manual acima para começar.</div>
               </div>
             </td>
           </tr>
@@ -984,31 +613,9 @@ Regras importantes:
 
       notasSessao = [];
       resultadoExtracao = null;
-      removerArquivo();
+      document.getElementById('resultado-card').style.display = 'none';
       renderNotasSessao();
       toast('Nova sessão iniciada.', 'success');
-    });
-
-    /* ---------- Modal API Key ---------- */
-
-    function abrirModalApiKey() {
-      document.getElementById('input-api-key').value = '';
-      openModal('modal-api-key');
-    }
-
-    document.getElementById('btn-config-api-corner').addEventListener('click', abrirModalApiKey);
-
-    document.getElementById('form-api-key').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const valor = document.getElementById('input-api-key').value.trim();
-      if (!valor) {
-        toast('Informe uma chave válida.', 'error');
-        return;
-      }
-      setApiKey(valor);
-      renderApiKeyStatus();
-      closeModal('modal-api-key');
-      toast('API Key salva neste navegador.', 'success');
     });
 
     /* ---------- Init ---------- */
@@ -1031,13 +638,7 @@ Regras importantes:
     popularSessao();
     popularSelectItemManual();
     resetManualForm();
-    renderApiKeyStatus();
     renderNotasSessao();
-
-    if (!getApiKey() && !localStorage.getItem(API_KEY_PROMPTED_STORAGE)) {
-      localStorage.setItem(API_KEY_PROMPTED_STORAGE, '1');
-      abrirModalApiKey();
-    }
   </script>
 </body>
 </html>

@@ -285,6 +285,9 @@ const STORAGE_KEY_SESSION = 'lbd_session_v1';
 const STORAGE_KEY_LOJA = 'lbd_loja_ativa_v1';
 
 function getData() {
+  localStorage.removeItem('lbd_api_key');
+  localStorage.removeItem('lbd_api_key_prompted');
+
   const raw = localStorage.getItem(STORAGE_KEY_DATA);
   if (!raw) {
     const inicial = JSON.parse(JSON.stringify(DADOS_INICIAIS));
