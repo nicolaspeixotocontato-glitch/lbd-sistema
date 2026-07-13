@@ -229,26 +229,15 @@
     let notasSessao = [];
     let manualItens = [];
 
-    function normalizarTexto(s) {
-      const str = (s || '').toString().toLowerCase().normalize('NFD');
-      let out = '';
-      for (const ch of str) {
-        const code = ch.codePointAt(0);
-        if (code >= 0x300 && code <= 0x36f) continue;
-        out += ch;
-      }
-      return out.trim();
-    }
-
     function sugerirItem(nomeExtraido) {
       const data = getData();
-      const alvo = normalizarTexto(nomeExtraido);
+      const alvo = normalizarBusca(nomeExtraido);
       const tokensAlvo = alvo.split(/\s+/).filter(Boolean);
       let melhor = null;
       let melhorScore = 0;
 
       data.itens.filter((i) => i.ativo).forEach((item) => {
-        const nomeItem = normalizarTexto(item.nome);
+        const nomeItem = normalizarBusca(item.nome);
         if (!nomeItem) return;
         let score = 0;
         if (nomeItem.includes(alvo) || alvo.includes(nomeItem)) score += 2;

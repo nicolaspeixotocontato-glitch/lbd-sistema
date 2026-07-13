@@ -117,7 +117,7 @@
 
     function getRegistrosFiltrados() {
       const data = getData();
-      const buscaNorm = busca.trim().toLowerCase();
+      const buscaNorm = normalizarBusca(busca);
       let cutoff = 0;
       if (filtroPeriodo === 'hoje') { const d = new Date(); d.setHours(0, 0, 0, 0); cutoff = d.getTime(); }
       else if (filtroPeriodo === '7dias') cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -133,8 +133,8 @@
 
         if (buscaNorm) {
           const item = data.itens.find((i) => i.id === h.itemId);
-          const nomeItem = (item ? item.nome : '').toLowerCase();
-          const nomeUsuario = (h.userNome || '').toLowerCase();
+          const nomeItem = normalizarBusca(item ? item.nome : '');
+          const nomeUsuario = normalizarBusca(h.userNome || '');
           if (!nomeItem.includes(buscaNorm) && !nomeUsuario.includes(buscaNorm)) return false;
         }
         return true;

@@ -419,7 +419,22 @@ function getUsuarioAtivo() {
   return USUARIOS.find((u) => u.id === session.userId) || null;
 }
 
+// Rascunho da tela de Contagem: chave própria, isolada por usuário, nunca
+// misturada com lbd_data_v1 (o estoque real só muda ao confirmar a contagem).
+const STORAGE_KEY_CONTAGEM_DRAFT_PREFIX = 'lbd_contagem_draft_v1_';
+
+function getContagemDraftKey(userId) {
+  return STORAGE_KEY_CONTAGEM_DRAFT_PREFIX + userId;
+}
+
+function limparRascunhoContagem(userId) {
+  if (!userId) return;
+  localStorage.removeItem(getContagemDraftKey(userId));
+}
+
 function logout() {
+  const usuario = getUsuarioAtivo();
+  if (usuario) limparRascunhoContagem(usuario.id);
   clearSession();
   window.location.href = 'index.html';
 }
@@ -790,6 +805,16 @@ const MESES_EXTENSO = [
 function fmtDateFull(ts) {
   const d = new Date(ts);
   return `${d.getDate()} de ${MESES_EXTENSO[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+// Normaliza texto para busca: remove acentuação e caixa, para que "mussarela"
+// encontre "Mussarela" e vice-versa, independente de quem digitou com ou sem acento.
+function normalizarBusca(texto) {
+  return (texto || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
 /* ==========================================================================

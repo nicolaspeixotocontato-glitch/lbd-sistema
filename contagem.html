@@ -31,6 +31,13 @@
       box-shadow: inset 3px 0 0 var(--warning);
     }
 
+    /* Largura fixa: sem isso, a badge encolhe/cresce conforme o número digitado
+       muda (ex: de "Sem diferença" pra "+5"), deslocando o resto da linha/coluna. */
+    .diferenca-badge {
+      min-width: 104px;
+      justify-content: center;
+    }
+
     .resumo-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -188,6 +195,33 @@
     let filtroCategoria = 'todas';
     let resultadoContagem = null;
 
+    // Rascunho: só o preenchimento em andamento (loja, tipo, itensState), numa chave
+    // separada e isolada por usuário. Nunca escreve em lbd_data_v1 — o estoque real só
+    // muda ao confirmar a contagem, exatamente como já era antes.
+    function salvarRascunhoContagem() {
+      const usuario = getUsuarioAtivo();
+      if (!usuario) return;
+      const rascunho = {
+        lojaId: lojaSelecionada(),
+        tipo: tipoAtual,
+        itensState,
+        ts: Date.now(),
+      };
+      localStorage.setItem(getContagemDraftKey(usuario.id), JSON.stringify(rascunho));
+    }
+
+    function carregarRascunhoContagem() {
+      const usuario = getUsuarioAtivo();
+      if (!usuario) return null;
+      const raw = localStorage.getItem(getContagemDraftKey(usuario.id));
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        return null;
+      }
+    }
+
     function lojaSelecionada() {
       return document.getElementById('sessao-loja').value;
     }
@@ -235,6 +269,7 @@
       document.getElementById('th-observacao').style.display = tipo === 'mensal' ? '' : 'none';
       renderInfoUltimaContagem();
       renderTabelaItens();
+      salvarRascunhoContagem();
     }
 
     document.getElementById('tipo-semanal').addEventListener('click', () => setTipo('semanal'));
@@ -247,6 +282,7 @@
       renderInfoUltimaContagem();
       renderTabelaItens();
       renderContagensAnteriores();
+      salvarRascunhoContagem();
     });
 
     function renderInfoUltimaContagem() {
@@ -262,9 +298,9 @@
 
     function getItensVisiveis() {
       const data = getData();
-      const busca = buscaTexto.trim().toLowerCase();
+      const busca = normalizarBusca(buscaTexto);
       let itens = data.itens.filter((i) => i.ativo);
-      if (busca) itens = itens.filter((i) => i.nome.toLowerCase().includes(busca));
+      if (busca) itens = itens.filter((i) => normalizarBusca(i.nome).includes(busca));
       if (filtroCategoria !== 'todas') itens = itens.filter((i) => i.cat === filtroCategoria);
       return itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     }
@@ -354,6 +390,7 @@
 
       atualizarLinhaContagem(itemId);
       atualizarResumoFooter();
+      salvarRascunhoContagem();
     });
 
     function contarPendencias() {
@@ -411,6 +448,7 @@
 
       resultadoContagem = resultado.contagem;
       toast('Contagem registrada com sucesso.', 'success');
+      limparRascunhoContagem(usuario.id);
 
       renderResultado();
       inicializarItensState(lojaId);
@@ -513,7 +551,23 @@
     initClearButton('busca-input', 'btn-limpar-busca');
     popularSessao();
     popularCategoriaChips();
-    inicializarItensState(lojaSelecionada());
+
+    const rascunho = carregarRascunhoContagem();
+    const lojaSelectInicial = document.getElementById('sessao-loja');
+    const rascunhoValido = rascunho && rascunho.itensState
+      && Array.from(lojaSelectInicial.options).some((o) => o.value === rascunho.lojaId);
+
+    if (rascunhoValido) {
+      lojaSelectInicial.value = rascunho.lojaId;
+      tipoAtual = rascunho.tipo === 'mensal' ? 'mensal' : 'semanal';
+      document.getElementById('tipo-semanal').classList.toggle('is-active', tipoAtual === 'semanal');
+      document.getElementById('tipo-mensal').classList.toggle('is-active', tipoAtual === 'mensal');
+      itensState = rascunho.itensState;
+      toast('Rascunho anterior restaurado.', 'default');
+    } else {
+      inicializarItensState(lojaSelecionada());
+    }
+
     renderInfoUltimaContagem();
     renderTabelaItens();
     renderContagensAnteriores();

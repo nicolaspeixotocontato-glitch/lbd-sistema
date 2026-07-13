@@ -122,10 +122,10 @@
     const listaEl = document.getElementById('autocomplete-list');
 
     buscaInput.addEventListener('input', () => {
-      const termo = buscaInput.value.trim().toLowerCase();
+      const termo = normalizarBusca(buscaInput.value);
       if (!termo) { listaEl.style.display = 'none'; return; }
 
-      const resultados = getData().itens.filter((i) => i.ativo && i.nome.toLowerCase().includes(termo)).slice(0, 8);
+      const resultados = getData().itens.filter((i) => i.ativo && normalizarBusca(i.nome).includes(termo)).slice(0, 8);
       if (resultados.length === 0) {
         listaEl.innerHTML = '<div class="autocomplete-item text-muted">Nenhum item encontrado</div>';
       } else {

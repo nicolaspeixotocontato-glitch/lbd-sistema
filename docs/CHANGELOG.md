@@ -21,8 +21,58 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (Fase 3 — Contagem física primeiro, por
-ser a mais nova).
+Detalhamento das sprints mais recentes abaixo (correções pós-teste da Contagem
+primeiro, por ser a mais nova).
+
+---
+
+## 2026-07-13 — Correções pós-teste da Fase 3 (Contagem)
+
+**Objetivo:** corrigir 3 problemas encontrados por Nicolas ao testar a tela de
+Contagem pela primeira vez.
+
+### Corrigido
+
+- **Busca ignorava acentuação** — buscar "mussarela" não encontrava "Mussarela" (e
+  vice-versa) porque a comparação era só `.toLowerCase().includes()`, sem remover
+  acento. Criada função compartilhada `normalizarBusca()` em `assets/app.js` (remove
+  acentuação via `.normalize('NFD')` antes de comparar) e aplicada em todo lugar que
+  busca item por nome: `contagem.html`, `estoque.html`, `saidas.html`,
+  `transferencias.html` e `historico.html` (que também busca por nome de usuário).
+  `entradas.html` já tinha sua própria função equivalente (`normalizarTexto`, usada em
+  `sugerirItem`) — trocada pela função compartilhada para não manter duas
+  implementações da mesma coisa. `pedidos.html` não tem busca por nome (só filtros),
+  nada a corrigir lá.
+- **Deslocamento visual ao digitar a quantidade contada** — o badge de diferença
+  (`.diferenca-badge`) não tinha largura fixa; a largura mudava conforme o número
+  digitado (de "Sem diferença" pra "+5", por exemplo), deslocando o resto da
+  linha/coluna. Corrigido com `min-width` fixo (104px, cobre até "Sem diferença", o
+  rótulo mais longo) e `justify-content: center`.
+- **Perda de dados ao navegar para fora da tela sem confirmar (prioridade alta)** —
+  não havia nenhum rascunho: sair de Contagem por engano perdia todo o preenchimento.
+  Implementado rascunho persistente, isolado do estoque real:
+  - Nova chave de `localStorage` dedicada por usuário (`lbd_contagem_draft_v1_<userId>`,
+    via `getContagemDraftKey()` em `assets/app.js`) — nunca escreve em `lbd_data_v1`;
+    o estoque real só muda ao confirmar a contagem, exatamente como antes.
+  - Salva a cada alteração de quantidade, observação, loja ou tipo
+    (`salvarRascunhoContagem()`).
+  - Ao abrir a tela, restaura automaticamente se existir rascunho do usuário logado
+    (loja, tipo e valores por item) e avisa com um toast discreto ("Rascunho anterior
+    restaurado").
+  - Limpo ao confirmar a contagem com sucesso, e ao fazer logout
+    (`logout()`, em `assets/app.js`, agora limpa o rascunho de contagem do usuário que
+    está saindo).
+
+### Verificação
+
+Testado em servidor local: busca sem acento encontrando item com acento em
+`contagem.html`, `estoque.html`, `saidas.html`, `transferencias.html`; badge de
+diferença mantendo largura de 104px digitando de vazio até "-12.345" (nenhum
+deslocamento); preenchimento parcial de uma contagem sobrevivendo à navegação para
+outra página e voltando; confirmado que `lbd_data_v1` permanece intocado enquanto o
+rascunho existe; confirmado que o rascunho some após `logout()` e que um usuário
+diferente (Carlos, gerente) não enxerga o rascunho de outro usuário (Nicolas) ao abrir
+a tela — cada um tem sua própria chave isolada.
 
 ---
 

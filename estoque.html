@@ -263,12 +263,12 @@
     function getItensFiltrados() {
       const data = getData();
       const scope = getScopeLojas();
-      const busca = buscaTexto.trim().toLowerCase();
+      const busca = normalizarBusca(buscaTexto);
 
       let itens = data.itens.filter((i) => i.ativo);
 
       if (busca) {
-        itens = itens.filter((i) => i.nome.toLowerCase().includes(busca) || i.id.toLowerCase().includes(busca));
+        itens = itens.filter((i) => normalizarBusca(i.nome).includes(busca) || i.id.toLowerCase().includes(busca));
       }
       if (filtroCategoria !== 'todas') {
         itens = itens.filter((i) => i.cat === filtroCategoria);
