@@ -1,6 +1,6 @@
 {
   "updated": "13/07/2026",
-  "progressPercent": 40,
+  "progressPercent": 60,
   "phases": [
     {
       "num": 1,
@@ -8,24 +8,36 @@
       "status": "ok",
       "desc": "Substituição do catálogo fictício de fornecedores pelos 21 fornecedores reais da operação. LBD02 passou a se chamar \"LBD02 – Nonoai\".",
       "details": [
-        "Confirmado por Nicolas — alteração já executada e aceita.",
-        "Fornecedores reais: ceasa, pamplona, msx, dellys, kem, atacado, novomix, senar, frumar, gcn, divine, duplex, embnascimento, jbembalagens, queijoecia, triangulo, fruki, teresa, fensa, americanas, samsclub."
+        "Tinha sido confirmado só verbalmente antes, mas nunca executado de fato — corrigido em 13/07/2026 após validação técnica revelar a divergência.",
+        "Fornecedores reais: ceasa, pamplona, msx, dellys, kem, atacado, novomix, senar, frumar, gcn, divine, duplex, embnascimento, jbembalagens, queijoecia, triangulo, fruki, teresa, fensa, americanas, samsclub.",
+        "Validado em produção: 21 fornecedores reais presentes, LBD02 com nome e label corretos."
       ],
-      "pills": []
+      "pills": ["21 fornecedores reais", "LBD02 = Nonoai"]
     },
     {
       "num": 2,
-      "title": "Catálogo real de itens (153 itens)",
+      "title": "Catálogo real de itens (152 itens)",
       "status": "ok",
-      "desc": "Substituição do catálogo fictício de 30 itens de teste pelos 153 itens reais extraídos das planilhas de estoque e pedidos, com categorias específicas por produto.",
+      "desc": "Substituição do catálogo fictício de 30 itens de teste pelos itens reais extraídos das planilhas de estoque e pedidos, com categorias específicas por produto.",
       "details": [
         "Dados extraídos de CONTROLE_DE_ESTOQUE_LBD.xlsx e PEDIDOS_LBD.xlsx, revisados junto com Nicolas.",
         "Categorização refeita: 14 categorias específicas por produto.",
+        "Correção pontual aplicada: Abacaxi e Figo movidos para 'Molhos e Conservas' (são enlatados), bandeja de ovos de 20un removida (duplicada, só a de 30un é usada).",
         "Migração de dados preserva o histórico — itens fictícios antigos desativados, não apagados.",
-        "Validado em produção via console: 153 itens ativos, 30 desativados, catalogoVersion 2.",
-        "Correção pontual aplicada: Abacaxi e Figo movidos para 'Molhos e Conservas' (são enlatados), bandeja de ovos de 20un removida (duplicada, só a de 30un é usada)."
+        "Validado em produção: 152 itens ativos, 31 desativados (histórico preservado)."
       ],
-      "pills": ["153 itens ativos", "14 categorias", "30 desativados (histórico preservado)"]
+      "pills": ["152 itens ativos", "14 categorias", "histórico preservado"]
+    },
+    {
+      "num": "2.2",
+      "title": "Segurança: remoção do recurso de IA em Entradas",
+      "status": "ok",
+      "desc": "Remoção do recurso \"Cupom por foto (IA)\", que ainda não era usado e mantinha uma chave de API exposta em texto puro no navegador.",
+      "details": [
+        "Tela de Entradas agora abre direto no fluxo \"Nota manual\", único existente.",
+        "Validado em produção: nenhuma chave de API armazenada, recurso removido por completo."
+      ],
+      "pills": ["risco de segurança eliminado"]
     },
     {
       "num": 3,
@@ -36,7 +48,7 @@
         "Contagem simplificada todo domingo (para pedidos semanais).",
         "Contagem geral completa todo dia 1º do mês.",
         "Ajuste positivo quando sobra estoque físico; negativo quando falta.",
-        "Próxima fase a iniciar."
+        "Já desbloqueada — a Fase 1 (bloqueio anterior) foi corrigida. Próxima fase a iniciar."
       ],
       "pills": []
     },
@@ -64,28 +76,31 @@
   ],
   "findings": [
     {
-      "title": "Revisão de documentação executiva",
-      "text": "Bloqueada — acesso ao repositório (git/GitHub) retornando erro 403 nesta sessão. Aguardando Nicolas restaurar acesso ou colar o conteúdo dos arquivos diretamente."
+      "title": "Estrutura profissional do projeto",
+      "text": "Nova frente iniciada a pedido de Nicolas: documentação de governança, processo de entrega padronizado e revisão de arquitetura. Descoberto que docs/PROJECT_CONTEXT.md já cataloga 12 débitos técnicos reais (localStorage como único banco, autenticação trivial, dados hardcoded, CSS monolítico, deploy sem testes)."
+    },
+    {
+      "title": "Lição de processo",
+      "text": "Confirmações verbais não substituem validação técnica em produção. A Fase 1 tinha sido marcada como concluída sem checagem e ficou pendente por semanas sem ninguém notar — corrigido agora."
     },
     {
       "title": "Teste de UX real (mobile/navegador)",
       "text": "Concluído. Principais atritos: LBD03 (loja ainda não aberta) poluindo estatísticas do Painel; filtro de categorias do Estoque possivelmente denso no mobile; \"Novo item\" sem campo de fornecedor."
     },
     {
-      "title": "Entradas — comportamento padrão",
-      "text": "Abre por padrão na aba paga \"Cupom por foto (IA)\" em vez da gratuita \"Nota manual\"; fornecedor em Entradas é texto livre, desconectado da lista fixa usada em Pedidos."
-    },
-    {
       "title": "Outros achados de UX",
-      "text": "Gap de altura no sidebar em páginas longas (padrão já existente); dropdown de login expõe todos os usernames válidos."
+      "text": "Campo de fornecedor em Entradas é texto livre, desconectado da lista fixa usada em Pedidos; gap de altura no sidebar em páginas longas; dropdown de login expõe todos os usernames válidos."
     }
   ],
   "milestones": [
     { "text": "Execução e push da Fase 2 confirmados e validados em produção.", "status": "done" },
-    { "text": "Correção de categorias (Abacaxi/Figo) e remoção de item duplicado (bandeja de ovos 20un) enviada ao Claude Code.", "status": "next" },
-    { "text": "Validar em Pedidos: agregação \"Por fornecedor\" batendo com a lista real de fornecedores.", "status": "pending" },
-    { "text": "Iniciar Fase 3 — contagem física + CMV real.", "status": "pending" },
+    { "text": "Correção de categorias (Abacaxi/Figo) e remoção de item duplicado validadas.", "status": "done" },
+    { "text": "Recurso de IA removido e risco de segurança eliminado.", "status": "done" },
+    { "text": "Fase 1 corrigida de fato (fornecedores reais + LBD02 = Nonoai) e validada.", "status": "done" },
+    { "text": "Recriar os 5 documentos de governança que faltam (Roadmap, Sprint Board, Known Issues, Vision, resumo executivo).", "status": "next" },
+    { "text": "Formalizar o processo de entrega padrão (prompt → execução → validação técnica → registro).", "status": "pending" },
+    { "text": "Iniciar Fase 3 — contagem física + CMV real (já desbloqueada).", "status": "pending" },
     { "text": "Iniciar Fase 4 — ajuste manual de pedidos.", "status": "pending" },
-    { "text": "Retomar revisão da documentação executiva assim que o acesso ao repositório for resolvido.", "status": "pending" }
+    { "text": "Revisar os débitos técnicos remanescentes de PROJECT_CONTEXT.md.", "status": "pending" }
   ]
 }
