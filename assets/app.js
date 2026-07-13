@@ -66,7 +66,7 @@ const USUARIOS = [
 
 const DADOS_INICIAIS = {
   itens: [
-    { id: 'i001', nome: 'Abacaxi 400g', cat: 'Hortifruti', un: 'un', precoUnit: 15.26, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'msx' },
+    { id: 'i001', nome: 'Abacaxi 400g', cat: 'Molhos e Conservas', un: 'un', precoUnit: 15.26, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'msx' },
     { id: 'i002', nome: 'Açúcar 1kg', cat: 'Doces e Sobremesas', un: 'un', precoUnit: 3.59, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
     { id: 'i003', nome: 'Água com gás', cat: 'Bebidas', un: 'un', precoUnit: 1.35, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'fensa' },
     { id: 'i004', nome: 'Água Sanitária 5l', cat: 'Limpeza', un: 'un', precoUnit: 9.9, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
@@ -127,7 +127,7 @@ const DADOS_INICIAIS = {
     { id: 'i059', nome: 'Farinha de trigo 5kg', cat: 'Farinhas e Massas', un: 'un', precoUnit: 13.18, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
     { id: 'i060', nome: 'Fermento Salgado 500g', cat: 'Farinhas e Massas', un: 'un', precoUnit: 12.99, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
     { id: 'i061', nome: 'Fibra de limpeza geral verde', cat: 'Limpeza', un: 'un', precoUnit: 2.6, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
-    { id: 'i062', nome: 'Figo 450g', cat: 'Hortifruti', un: 'un', precoUnit: 15.98, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
+    { id: 'i062', nome: 'Figo 450g', cat: 'Molhos e Conservas', un: 'un', precoUnit: 15.98, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
     { id: 'i063', nome: 'Fruki 2 lts', cat: 'Bebidas', un: 'un', precoUnit: 5.24, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'fruki' },
     { id: 'i064', nome: 'Fruki 2 lts zero', cat: 'Bebidas', un: 'un', precoUnit: 5.24, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'fruki' },
     { id: 'i065', nome: 'Fruki 350', cat: 'Bebidas', un: 'un', precoUnit: 2.05, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'fruki' },
@@ -171,7 +171,6 @@ const DADOS_INICIAIS = {
     { id: 'i103', nome: 'Óleo de soja 900ml', cat: 'Óleos e Gorduras', un: 'un', precoUnit: 5.79, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
     { id: 'i104', nome: 'Orégano', cat: 'Temperos e Condimentos', un: 'kg', precoUnit: 31.9, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'queijoecia' },
     { id: 'i105', nome: 'Oreo Mini (com 10)', cat: 'Doces e Sobremesas', un: 'un', precoUnit: 2.59, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
-    { id: 'i106', nome: 'Ovos bandeja 20un', cat: 'Hortifruti', un: 'un', precoUnit: 15.5, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'ceasa' },
     { id: 'i107', nome: 'Ovos bandeja 30un', cat: 'Hortifruti', un: 'un', precoUnit: 15.5, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'ceasa' },
     { id: 'i108', nome: 'Paçoca 1,3KG', cat: 'Doces e Sobremesas', un: 'un', precoUnit: 28.9, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'atacado' },
     { id: 'i109', nome: 'Palmito 1,08kg', cat: 'Molhos e Conservas', un: 'un', precoUnit: 44, min: { LBD01: 0, LBD02: 0, LBD03: 0 }, qty: { LBD01: 0, LBD02: 0, LBD03: 0 }, ativo: true, fornecedorId: 'msx' },
@@ -333,6 +332,19 @@ function getData() {
     data.catalogoVersion = 2;
     saveData(data);
   }
+
+  let sincronizado = false;
+  data.itens.forEach((item) => {
+    if ((item.id === 'i001' || item.id === 'i062') && item.cat !== 'Molhos e Conservas') {
+      item.cat = 'Molhos e Conservas';
+      sincronizado = true;
+    }
+    if (item.id === 'i106' && item.ativo !== false) {
+      item.ativo = false;
+      sincronizado = true;
+    }
+  });
+  if (sincronizado) saveData(data);
 
   return data;
 }
