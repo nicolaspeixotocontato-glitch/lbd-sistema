@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contagem — La Bella Donna</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .filters-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .tipo-info {
+      font-size: var(--fs-12);
+      color: var(--text-muted);
+    }
+
+    .input-contada {
+      max-width: 110px;
+    }
+
+    .input-observacao {
+      min-width: 200px;
+    }
+
+    tr.row-pendente {
+      box-shadow: inset 3px 0 0 var(--warning);
+    }
+
+    .resumo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .resumo-grid {
+        grid-template-columns: repeat(1, 1fr);
+      }
+    }
+
+    .resumo-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .resumo-label {
+      font-size: var(--fs-11);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .resumo-value {
+      font-size: var(--fs-16);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar-mount"></aside>
+    <div class="sidebar-overlay"></div>
+    <header class="topbar" id="topbar-mount"></header>
+
+    <main class="main">
+      <div class="mb-16">
+        <h1 class="page-title">Contagem</h1>
+        <p class="page-subtitle">Contagem física de estoque e cálculo de consumo real, por loja e por período</p>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-header"><span class="card-title">Configuração da contagem</span></div>
+        <div class="card-body flex flex-col gap-16">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="sessao-loja">Loja</label>
+              <select class="form-select" id="sessao-loja"></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" for="sessao-responsavel">Responsável</label>
+              <input class="form-input" type="text" id="sessao-responsavel" readonly>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Tipo de contagem</label>
+            <div class="loja-tabs" id="tipo-tabs">
+              <button type="button" class="loja-tab is-active" id="tipo-semanal">Contagem semanal</button>
+              <button type="button" class="loja-tab" id="tipo-mensal">Contagem geral mensal</button>
+            </div>
+          </div>
+          <div class="tipo-info" id="info-ultima-contagem"></div>
+        </div>
+      </div>
+
+      <div class="card mb-16">
+        <div class="card-header flex items-center justify-between" style="flex-wrap:wrap; gap:12px;">
+          <span class="card-title">Itens para contagem</span>
+        </div>
+        <div class="card-body flex flex-col gap-16">
+          <div class="filters-row">
+            <div class="search-input" style="max-width:300px; flex:1;">
+              <span class="search-input-icon" id="search-icon"></span>
+              <input type="text" id="busca-input" placeholder="Buscar item por nome...">
+              <button class="input-clear-btn" id="btn-limpar-busca" type="button" aria-label="Limpar busca"></button>
+            </div>
+          </div>
+          <div class="filter-chips" id="categoria-chips"></div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Categoria</th>
+                <th>UN</th>
+                <th class="td-num">Estoque atual</th>
+                <th>Quantidade contada</th>
+                <th>Diferença</th>
+                <th id="th-observacao">Observação</th>
+              </tr>
+            </thead>
+            <tbody id="itens-contagem-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card-footer flex items-center justify-between" style="flex-wrap:wrap; gap:8px;">
+          <span class="text-secondary" id="footer-resumo-contagem"></span>
+          <button class="btn btn-primary btn-md" id="btn-confirmar-contagem" type="button">Confirmar contagem</button>
+        </div>
+      </div>
+
+      <div class="card mb-16" id="resultado-card" style="display:none">
+        <div class="card-header"><span class="card-title">Resultado da última contagem</span></div>
+        <div class="card-body flex flex-col gap-16">
+          <div class="resumo-grid" id="resultado-resumo"></div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th class="td-num">Estoque anterior</th>
+                  <th class="td-num">Entradas no período</th>
+                  <th class="td-num">Contado</th>
+                  <th class="td-num">Diferença</th>
+                  <th class="td-num">Consumo calculado</th>
+                  <th class="td-num">Valor</th>
+                  <th>Observação</th>
+                </tr>
+              </thead>
+              <tbody id="resultado-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Contagens anteriores desta loja</span></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Usuário</th>
+                <th class="td-num">Itens</th>
+                <th class="td-num">Com diferença</th>
+                <th class="td-num">Valor de consumo</th>
+              </tr>
+            </thead>
+            <tbody id="contagens-anteriores-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let itensState = {};
+    let tipoAtual = 'semanal';
+    let buscaTexto = '';
+    let filtroCategoria = 'todas';
+    let resultadoContagem = null;
+
+    function lojaSelecionada() {
+      return document.getElementById('sessao-loja').value;
+    }
+
+    function popularSessao() {
+      const select = document.getElementById('sessao-loja');
+      const permitidas = lojasPermitidas();
+      select.innerHTML = permitidas.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+
+      const usuario = getUsuarioAtivo();
+      select.value = permitidas.length === LOJAS.length ? getLojaAtiva() : usuario.loja;
+      select.disabled = permitidas.length === 1;
+
+      document.getElementById('sessao-responsavel').value = usuario ? usuario.nome : '';
+    }
+
+    function popularCategoriaChips() {
+      const opcoes = ['todas', ...CATEGORIAS];
+      document.getElementById('categoria-chips').innerHTML = opcoes.map((c) => `
+        <button type="button" class="filter-chip${c === filtroCategoria ? ' is-active' : ''}" onclick="setFiltroCategoria('${c}')">${c === 'todas' ? 'Todas categorias' : c}</button>
+      `).join('');
+    }
+
+    function setFiltroCategoria(c) {
+      filtroCategoria = c;
+      popularCategoriaChips();
+      renderTabelaItens();
+    }
+
+    function inicializarItensState(lojaId) {
+      const data = getData();
+      itensState = {};
+      data.itens.filter((i) => i.ativo).forEach((item) => {
+        itensState[item.id] = {
+          quantidadeContada: item.qty[lojaId] ?? 0,
+          observacao: '',
+        };
+      });
+    }
+
+    function setTipo(tipo) {
+      tipoAtual = tipo;
+      document.getElementById('tipo-semanal').classList.toggle('is-active', tipo === 'semanal');
+      document.getElementById('tipo-mensal').classList.toggle('is-active', tipo === 'mensal');
+      document.getElementById('th-observacao').style.display = tipo === 'mensal' ? '' : 'none';
+      renderInfoUltimaContagem();
+      renderTabelaItens();
+    }
+
+    document.getElementById('tipo-semanal').addEventListener('click', () => setTipo('semanal'));
+    document.getElementById('tipo-mensal').addEventListener('click', () => setTipo('mensal'));
+
+    document.getElementById('sessao-loja').addEventListener('change', () => {
+      inicializarItensState(lojaSelecionada());
+      resultadoContagem = null;
+      document.getElementById('resultado-card').style.display = 'none';
+      renderInfoUltimaContagem();
+      renderTabelaItens();
+      renderContagensAnteriores();
+    });
+
+    function renderInfoUltimaContagem() {
+      const ultima = getUltimaContagem(lojaSelecionada(), tipoAtual);
+      const el = document.getElementById('info-ultima-contagem');
+      const rotuloTipo = tipoAtual === 'semanal' ? 'semanal' : 'mensal';
+      if (!ultima) {
+        el.textContent = `Nenhuma contagem ${rotuloTipo} registrada ainda para esta loja — o cálculo vai considerar todo o histórico desde o início.`;
+      } else {
+        el.textContent = `Última contagem ${rotuloTipo} desta loja: ${fmtDateFull(ultima.ts)}, por ${ultima.userNome || '—'}.`;
+      }
+    }
+
+    function getItensVisiveis() {
+      const data = getData();
+      const busca = buscaTexto.trim().toLowerCase();
+      let itens = data.itens.filter((i) => i.ativo);
+      if (busca) itens = itens.filter((i) => i.nome.toLowerCase().includes(busca));
+      if (filtroCategoria !== 'todas') itens = itens.filter((i) => i.cat === filtroCategoria);
+      return itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    }
+
+    function badgeDiferenca(diferenca) {
+      if (diferenca === 0) return { cls: 'badge-neutral', label: 'Sem diferença' };
+      if (diferenca > 0) return { cls: 'badge-info', label: `+${fmt(diferenca)}` };
+      return { cls: 'badge-out', label: fmt(diferenca) };
+    }
+
+    function renderTabelaItens() {
+      const lojaId = lojaSelecionada();
+      const itens = getItensVisiveis();
+      const tbody = document.getElementById('itens-contagem-tbody');
+      const showObs = tipoAtual === 'mensal';
+      document.getElementById('th-observacao').style.display = showObs ? '' : 'none';
+
+      if (itens.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7">
+              <div class="empty-state">
+                <span class="empty-state-icon">${ICONS.contagem}</span>
+                <div class="empty-state-title">Nenhum item encontrado</div>
+                <div class="empty-state-subtitle">Ajuste a busca ou a categoria.</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      } else {
+        tbody.innerHTML = itens.map((item) => {
+          const estoqueAtual = item.qty[lojaId] ?? 0;
+          const estado = itensState[item.id] || { quantidadeContada: estoqueAtual, observacao: '' };
+          const diferenca = estado.quantidadeContada - estoqueAtual;
+          const badge = badgeDiferenca(diferenca);
+          const precisaObs = showObs && diferenca !== 0;
+
+          return `
+            <tr data-item-id="${item.id}" data-estoque-atual="${estoqueAtual}" class="${precisaObs && !(estado.observacao || '').trim() ? 'row-pendente' : ''}">
+              <td>${item.nome}</td>
+              <td class="td-muted">${item.cat}</td>
+              <td class="td-muted">${item.un}</td>
+              <td class="td-num">${fmt(estoqueAtual)}</td>
+              <td><input class="form-input input-contada" type="number" min="0" step="0.01" value="${estado.quantidadeContada}" data-item-id="${item.id}"></td>
+              <td><span class="badge ${badge.cls} diferenca-badge">${badge.label}</span></td>
+              <td style="display:${showObs ? '' : 'none'}">
+                <input class="form-input input-observacao" type="text" placeholder="${precisaObs ? 'Obrigatório: explique a diferença' : 'Opcional'}" value="${estado.observacao || ''}" data-item-id="${item.id}">
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      atualizarResumoFooter();
+    }
+
+    function atualizarLinhaContagem(itemId) {
+      const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
+      if (!row) return;
+      const estoqueAtual = Number(row.dataset.estoqueAtual) || 0;
+      const estado = itensState[itemId];
+      const diferenca = estado.quantidadeContada - estoqueAtual;
+      const badge = badgeDiferenca(diferenca);
+
+      const badgeEl = row.querySelector('.diferenca-badge');
+      badgeEl.className = `badge ${badge.cls} diferenca-badge`;
+      badgeEl.textContent = badge.label;
+
+      const precisaObs = tipoAtual === 'mensal' && diferenca !== 0;
+      const obsInput = row.querySelector('.input-observacao');
+      if (obsInput) obsInput.placeholder = precisaObs ? 'Obrigatório: explique a diferença' : 'Opcional';
+      row.classList.toggle('row-pendente', precisaObs && !(estado.observacao || '').trim());
+    }
+
+    document.getElementById('itens-contagem-tbody').addEventListener('input', (e) => {
+      const el = e.target;
+      const itemId = el.dataset.itemId;
+      if (!itemId || !itensState[itemId]) return;
+
+      if (el.classList.contains('input-contada')) {
+        itensState[itemId].quantidadeContada = Number(el.value) || 0;
+      } else if (el.classList.contains('input-observacao')) {
+        itensState[itemId].observacao = el.value;
+      } else {
+        return;
+      }
+
+      atualizarLinhaContagem(itemId);
+      atualizarResumoFooter();
+    });
+
+    function contarPendencias() {
+      const lojaId = lojaSelecionada();
+      const data = getData();
+      let comDiferenca = 0;
+      let pendentesObs = 0;
+
+      Object.keys(itensState).forEach((itemId) => {
+        const item = data.itens.find((i) => i.id === itemId && i.ativo);
+        if (!item) return;
+        const estoqueAtual = item.qty[lojaId] ?? 0;
+        const diferenca = itensState[itemId].quantidadeContada - estoqueAtual;
+        if (diferenca !== 0) {
+          comDiferenca++;
+          if (tipoAtual === 'mensal' && !(itensState[itemId].observacao || '').trim()) pendentesObs++;
+        }
+      });
+
+      return { comDiferenca, pendentesObs };
+    }
+
+    function atualizarResumoFooter() {
+      const { comDiferenca, pendentesObs } = contarPendencias();
+      const totalItens = Object.keys(itensState).length;
+      let texto = `${totalItens} ${totalItens === 1 ? 'item' : 'itens'} · ${comDiferenca} com diferença`;
+      if (tipoAtual === 'mensal' && pendentesObs > 0) {
+        texto += ` · ${pendentesObs} aguardando observação`;
+      }
+      document.getElementById('footer-resumo-contagem').textContent = texto;
+      document.getElementById('btn-confirmar-contagem').disabled = tipoAtual === 'mensal' && pendentesObs > 0;
+    }
+
+    document.getElementById('btn-confirmar-contagem').addEventListener('click', () => {
+      const lojaId = lojaSelecionada();
+      const usuario = getUsuarioAtivo();
+
+      const { pendentesObs } = contarPendencias();
+      if (tipoAtual === 'mensal' && pendentesObs > 0) {
+        toast('Preencha a observação nos itens com diferença antes de confirmar a contagem mensal.', 'error');
+        return;
+      }
+
+      const itensContados = Object.keys(itensState).map((itemId) => ({
+        itemId,
+        quantidadeContada: itensState[itemId].quantidadeContada,
+        observacao: itensState[itemId].observacao,
+      }));
+
+      const resultado = registrarContagem(lojaId, tipoAtual, itensContados, usuario);
+      if (!resultado.ok) {
+        toast(resultado.erro, 'error');
+        return;
+      }
+
+      resultadoContagem = resultado.contagem;
+      toast('Contagem registrada com sucesso.', 'success');
+
+      renderResultado();
+      inicializarItensState(lojaId);
+      renderInfoUltimaContagem();
+      renderTabelaItens();
+      renderContagensAnteriores();
+    });
+
+    function renderResultado() {
+      const c = resultadoContagem;
+      const card = document.getElementById('resultado-card');
+      if (!c) { card.style.display = 'none'; return; }
+
+      const data = getData();
+      const comDiferenca = c.itens.filter((i) => i.diferenca !== 0);
+      const valorConsumoTotal = c.itens.reduce((acc, i) => acc + i.valorConsumo, 0);
+
+      document.getElementById('resultado-resumo').innerHTML = `
+        <div class="resumo-item">
+          <span class="resumo-label">Tipo</span>
+          <span class="resumo-value">${c.tipo === 'semanal' ? 'Semanal' : 'Mensal'} — ${c.lojaId}</span>
+        </div>
+        <div class="resumo-item">
+          <span class="resumo-label">Itens com diferença</span>
+          <span class="resumo-value">${comDiferenca.length} de ${c.itens.length}</span>
+        </div>
+        <div class="resumo-item">
+          <span class="resumo-label">Valor de consumo calculado</span>
+          <span class="resumo-value">${fmtR(valorConsumoTotal)}</span>
+        </div>
+      `;
+
+      const linhas = comDiferenca.length > 0 ? comDiferenca : c.itens;
+      document.getElementById('resultado-tbody').innerHTML = linhas.map((i) => {
+        const item = data.itens.find((it) => it.id === i.itemId);
+        return `
+          <tr>
+            <td>${item ? item.nome : i.itemId}</td>
+            <td class="td-num">${fmt(i.estoqueAnterior)}</td>
+            <td class="td-num">${fmt(i.entradasNoPeriodo)}</td>
+            <td class="td-num">${fmt(i.quantidadeContada)}</td>
+            <td class="td-num">${i.diferenca > 0 ? '+' : ''}${fmt(i.diferenca)}</td>
+            <td class="td-num">${fmt(i.consumoCalculado)}</td>
+            <td class="td-num">${fmtR(i.valorConsumo)}</td>
+            <td class="td-muted">${i.observacao || '—'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      card.style.display = '';
+    }
+
+    function renderContagensAnteriores() {
+      const lojaId = lojaSelecionada();
+      const data = getData();
+      const contagens = (data.contagens || [])
+        .filter((c) => c.lojaId === lojaId)
+        .sort((a, b) => b.ts - a.ts);
+
+      const tbody = document.getElementById('contagens-anteriores-tbody');
+      if (contagens.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6">
+              <div class="empty-state">
+                <span class="empty-state-icon">${ICONS.contagem}</span>
+                <div class="empty-state-title">Nenhuma contagem registrada</div>
+                <div class="empty-state-subtitle">As contagens confirmadas nesta loja aparecerão aqui.</div>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = contagens.map((c) => {
+        const comDiferenca = c.itens.filter((i) => i.diferenca !== 0).length;
+        const valorConsumoTotal = c.itens.reduce((acc, i) => acc + i.valorConsumo, 0);
+        return `
+          <tr>
+            <td class="td-muted">${fmtDate(c.ts)}</td>
+            <td><span class="badge ${c.tipo === 'mensal' ? 'badge-info' : 'badge-neutral'}">${c.tipo === 'mensal' ? 'Mensal' : 'Semanal'}</span></td>
+            <td class="td-muted">${c.userNome || '—'}</td>
+            <td class="td-num">${fmt(c.itens.length)}</td>
+            <td class="td-num">${fmt(comDiferenca)}</td>
+            <td class="td-num">${fmtR(valorConsumoTotal)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('busca-input').addEventListener('input', (e) => {
+      buscaTexto = e.target.value;
+      renderTabelaItens();
+    });
+
+    initTopbar('contagem');
+    document.getElementById('search-icon').innerHTML = ICONS.search;
+    document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
+    initClearButton('busca-input', 'btn-limpar-busca');
+    popularSessao();
+    popularCategoriaChips();
+    inicializarItensState(lojaSelecionada());
+    renderInfoUltimaContagem();
+    renderTabelaItens();
+    renderContagensAnteriores();
+  </script>
+</body>
+</html>

@@ -240,6 +240,7 @@ const DADOS_INICIAIS = {
     { id: 'h5', ts: Date.now() - 1000 * 60 * 60 * 4, tipo: 'entrada', lojaId: 'LBD03', itemId: 'i11', qty: 20, motivo: null, userId: 'u1', userNome: 'Nicolas' },
     { id: 'h6', ts: Date.now() - 1000 * 60 * 30, tipo: 'saida', lojaId: 'LBD01', itemId: 'i22', qty: 24, motivo: 'Consumo em produção', userId: 'u4', userNome: 'Pedro' },
   ],
+  contagens: [],
 };
 
 /* ==========================================================================
@@ -314,6 +315,11 @@ function getData() {
 
   if (!data.fornecedores || data.fornecedores.length === 0) {
     data.fornecedores = JSON.parse(JSON.stringify(FORNECEDORES));
+    migrado = true;
+  }
+
+  if (!data.contagens) {
+    data.contagens = [];
     migrado = true;
   }
 
@@ -423,8 +429,8 @@ function logout() {
    ========================================================================== */
 
 const PERMISSOES_POR_PERFIL = {
-  gerente: ['ver_painel', 'ver_estoque', 'ver_entradas', 'ver_saidas', 'ver_transferencias', 'ver_historico', 'ver_pedidos'],
-  operador: ['ver_saidas'],
+  gerente: ['ver_painel', 'ver_estoque', 'ver_entradas', 'ver_saidas', 'ver_transferencias', 'ver_historico', 'ver_pedidos', 'ver_contagem'],
+  operador: ['ver_saidas', 'ver_contagem'],
 };
 
 const PAGINA_PERMISSAO = {
@@ -436,6 +442,7 @@ const PAGINA_PERMISSAO = {
   historico: 'ver_historico',
   pedidos: 'ver_pedidos',
   etiquetas: 'editar_estoque',
+  contagem: 'ver_contagem',
 };
 
 function checkPermissao(acao) {
@@ -564,6 +571,123 @@ function registrarTransferencia(origemId, destinoId, itemId, qty, user) {
 
   saveData(data);
   return { ok: true };
+}
+
+/* ==========================================================================
+   5b. Contagem física de estoque (CMV real)
+   ========================================================================== */
+
+function gerarIdContagem() {
+  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function getUltimaContagem(lojaId, tipo) {
+  const data = getData();
+  return (data.contagens || [])
+    .filter((c) => c.lojaId === lojaId && c.tipo === tipo)
+    .sort((a, b) => b.ts - a.ts)[0] || null;
+}
+
+// Calcula a contagem (sem gravar nada) para pré-visualização na tela: diferença,
+// consumo e valor de consumo por item, usando a mesma fórmula de registrarContagem.
+function calcularContagem(lojaId, tipo, itensContados) {
+  const data = getData();
+  const ultimaContagem = getUltimaContagem(lojaId, tipo);
+  const cutoffTs = ultimaContagem ? ultimaContagem.ts : 0;
+
+  return itensContados.map((entrada) => {
+    const item = data.itens.find((i) => i.id === entrada.itemId);
+    if (!item) return null;
+
+    const estoqueAnterior = item.qty[lojaId] ?? 0;
+    const quantidadeContada = Number(entrada.quantidadeContada) || 0;
+
+    const entradasNoPeriodo = data.historico.reduce((acc, h) => {
+      if (h.itemId !== entrada.itemId || h.lojaId !== lojaId || h.ts <= cutoffTs) return acc;
+      if (h.tipo === 'entrada') return acc + h.qty;
+      if (h.tipo === 'saida') return acc - h.qty;
+      return acc;
+    }, 0);
+
+    // Não soma entradasNoPeriodo aqui: qty[loja] (estoqueAnterior) já reflete em
+    // tempo real as entradas/saídas registradas pelo sistema — somar de novo
+    // contaria a mesma entrada duas vezes. entradasNoPeriodo fica só como dado
+    // informativo/de contexto para quem revisa a contagem.
+    const consumoCalculado = estoqueAnterior - quantidadeContada;
+    const ultimoPreco = getUltimoPrecoPago(entrada.itemId);
+    const precoUsado = ultimoPreco ? ultimoPreco.precoPago : item.precoUnit;
+    const valorConsumo = consumoCalculado * precoUsado;
+    const diferenca = quantidadeContada - estoqueAnterior;
+
+    return {
+      itemId: entrada.itemId,
+      estoqueAnterior,
+      entradasNoPeriodo,
+      quantidadeContada,
+      consumoCalculado,
+      valorConsumo,
+      diferenca,
+      observacao: (entrada.observacao || '').trim() || null,
+    };
+  }).filter(Boolean);
+}
+
+// Grava a contagem: ajusta qty[loja] de cada item para o valor contado, registra um
+// historico tipo 'ajuste' por item, e um registro em data.contagens. Tudo ou nada —
+// se a contagem mensal tiver item com diferença sem observação, nada é gravado.
+function registrarContagem(lojaId, tipo, itensContados, user) {
+  const data = getData();
+  const processados = calcularContagem(lojaId, tipo, itensContados);
+
+  if (tipo === 'mensal') {
+    const semObservacao = processados.find((p) => p.diferenca !== 0 && !p.observacao);
+    if (semObservacao) {
+      const item = data.itens.find((i) => i.id === semObservacao.itemId);
+      return { ok: false, erro: `Observação obrigatória para "${item ? item.nome : semObservacao.itemId}" (diferença detectada na contagem mensal).` };
+    }
+  }
+
+  const contagemId = gerarIdContagem();
+  const ts = Date.now();
+
+  processados.forEach((p) => {
+    const item = data.itens.find((i) => i.id === p.itemId);
+    if (!item) return;
+    item.qty[lojaId] = p.quantidadeContada;
+
+    // Só registra no histórico quando a contagem de fato mudou algo — item sem
+    // diferença não é uma movimentação, é só a confirmação de que bateu.
+    if (p.diferenca === 0) return;
+
+    data.historico.unshift({
+      id: gerarIdHistorico(),
+      ts,
+      tipo: 'ajuste',
+      lojaId,
+      itemId: p.itemId,
+      qty: p.diferenca,
+      motivo: 'contagem',
+      userId: user?.id || null,
+      userNome: user?.nome || null,
+      contagemId,
+    });
+  });
+
+  const contagem = {
+    id: contagemId,
+    ts,
+    lojaId,
+    tipo,
+    userId: user?.id || null,
+    userNome: user?.nome || null,
+    itens: processados,
+  };
+
+  if (!data.contagens) data.contagens = [];
+  data.contagens.unshift(contagem);
+
+  saveData(data);
+  return { ok: true, contagem };
 }
 
 function adicionarItem(itemData) {
@@ -803,6 +927,7 @@ const NAV_ITEMS = [
   { id: 'entradas', label: 'Entradas', href: 'entradas.html', icon: 'entradas', acao: 'ver_entradas' },
   { id: 'saidas', label: 'Saídas', href: 'saidas.html', icon: 'saidas', acao: 'ver_saidas' },
   { id: 'transferencias', label: 'Transferências', href: 'transferencias.html', icon: 'transfer', acao: 'ver_transferencias' },
+  { id: 'contagem', label: 'Contagem', href: 'contagem.html', icon: 'contagem', acao: 'ver_contagem' },
   { id: 'historico', label: 'Histórico', href: 'historico.html', icon: 'historico', acao: 'ver_historico' },
   { id: 'pedidos', label: 'Pedidos', href: 'pedidos.html', icon: 'pedidos', acao: 'ver_pedidos' },
   { id: 'etiquetas', label: 'Etiquetas', href: 'etiquetas.html', icon: 'etiquetas', acao: 'editar_estoque' },
@@ -1050,4 +1175,5 @@ const ICONS = {
   pedidos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"/></svg>',
   etiquetas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3"/><path d="M14 21h.01"/><path d="M21 14v.01"/><path d="M21 21h-3"/></svg>',
   camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/></svg>',
+  contagem: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 12l2 2 4-4"/></svg>',
 };

@@ -8,33 +8,35 @@
 
 ## Em andamento agora
 
-- [ ] Escrever e revisar os 5 documentos de governança que faltavam (`VISION.md`,
-      `ROADMAP.md`, `SPRINT_BOARD.md` — este arquivo —, `KNOWN_ISSUES.md`,
-      `CEO_DASHBOARD.md`).
+- Nenhuma tarefa em andamento no momento.
 
 ## Concluído recentemente
 
+- [x] Fase 3 — tela de Contagem física (semanal/mensal), cálculo automático de
+      consumo/CMV e ajuste de estoque (`contagem.html`, novo tipo de histórico
+      `'ajuste'`, novo array `data.contagens`) — implementada e validada em servidor
+      local (contagem semanal e mensal, diferença positiva e negativa, bloqueio do
+      fechamento mensal sem observação). Fórmula de consumo corrigida durante a
+      validação (dupla contagem de entradas); detalhe em `CHANGELOG.md`.
 - [x] Corrigir Fase 1 de fato (fornecedores reais + LBD02 → Nonoai) — validado em produção.
 - [x] Corrigir categorização de itens enlatados e remover item duplicado — validado.
 - [x] Remover recurso de IA / chave de API exposta em Entradas — validado.
 - [x] Publicar dashboard de acompanhamento ao vivo em `dashboard/index.html`.
-- [x] Micro Sprint Mobile First (`assets/style.css` + 8 páginas operacionais) —
-      implementada e validada visualmente em portrait/landscape/tablet/desktop
-      (ver `CHANGELOG.md`, 13/07/2026). **Ainda não commitada nem enviada ao
-      GitHub** — ver bloqueio abaixo.
+- [x] Micro Sprint Mobile First (`assets/style.css`, `entradas.html`,
+      `saidas.html`) — implementada, validada visualmente em
+      portrait/landscape/tablet/desktop, e **commitada e enviada ao GitHub**
+      (commit `52477e9`, 13/07/2026).
 
 ## Próximo da fila (ainda não iniciado)
 
-- [ ] Commitar e enviar ao GitHub a Micro Sprint Mobile First.
 - [ ] Formalizar o processo de entrega padrão (prompt → execução → validação técnica
       em produção com hard refresh → registro no changelog e no roadmap).
-- [ ] Iniciar Fase 3 — contagem física de estoque e cálculo de CMV real.
+- [ ] Iniciar Fase 4 — ajuste manual de pedidos.
 - [ ] Revisar os débitos técnicos remanescentes listados em `PROJECT_CONTEXT.md`.
+- [ ] Decidir o que fazer com `0001-fix-mobile-responsavel.patch` (arquivo solto,
+      não rastreado pelo Git, na raiz do projeto — aparenta ser resíduo de uma
+      correção já commitada anteriormente).
 
 ## Bloqueios ativos
 
-- Micro Sprint Mobile First está concluída e validada, mas existe **só como
-  mudança local não commitada** no computador (decisão explícita da rodada
-  anterior). Enquanto não for commitada, o trabalho não tem backup nem
-  histórico no Git — risco de perda se os arquivos locais forem alterados ou
-  perdidos antes do commit.
+- Nenhum no momento.

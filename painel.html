@@ -229,6 +229,7 @@
     function iconHistorico(tipo) {
       if (tipo === 'entrada') return { icon: ICONS['arrow-down'], cls: 'is-in' };
       if (tipo === 'saida') return { icon: ICONS['arrow-up'], cls: 'is-out' };
+      if (tipo === 'ajuste') return { icon: ICONS.contagem, cls: 'is-transfer' };
       return { icon: ICONS.swap, cls: 'is-transfer' };
     }
 
@@ -274,6 +275,10 @@
           titulo = `Saída: ${nomeItem}`;
           meta = `${h.lojaId}${h.motivo ? ' • ' + h.motivo : ''} • ${h.userNome || '—'} • ${fmtDate(h.ts)}`;
           qtyLabel = `-${fmt(h.qty)} ${un}`;
+        } else if (h.tipo === 'ajuste') {
+          titulo = `Ajuste por contagem: ${nomeItem}`;
+          meta = `${h.lojaId} • ${h.userNome || '—'} • ${fmtDate(h.ts)}`;
+          qtyLabel = `${h.qty > 0 ? '+' : ''}${fmt(h.qty)} ${un}`;
         } else {
           titulo = `Transferência: ${nomeItem}`;
           meta = `${h.origemId} → ${h.destinoId} • ${h.userNome || '—'} • ${fmtDate(h.ts)}`;

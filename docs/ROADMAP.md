@@ -41,24 +41,30 @@ Remoção do recurso de leitura de cupom fiscal por foto (IA), que ainda não es
 uso e mantinha uma chave de API em texto puro no navegador do usuário.
 
 ## Sprint extra — Micro Sprint Mobile First (UX)
-**Status: concluída (implementação e validação) — pendente de commit**
+**Status: concluída**
 
-Melhorias de experiência em celulares e tablets (360–1024px) em `assets/style.css`
-e nas 8 páginas operacionais: tabelas sem quebra de texto ilegível, topbar sem
+Melhorias de experiência em celulares e tablets (360–1024px) em `assets/style.css`,
+`entradas.html` e `saidas.html`: tabelas sem quebra de texto ilegível, topbar sem
 estourar altura em telas estreitas, botões de rodapé sem corte, campo de busca
 ocupando a linha inteira em mobile, alvos de toque maiores. Sem novas
 funcionalidades e sem alteração de regra de negócio. Detalhes em `CHANGELOG.md`
-(13/07/2026). Trabalho validado localmente, mas ainda **não commitado nem
-enviado ao GitHub** — ver `SPRINT_BOARD.md`, seção "Bloqueios ativos".
+(13/07/2026). Commitada e enviada ao GitHub (commit `52477e9`, 13/07/2026).
 
 ## Fase 3 — Contagem física e CMV real
-**Status: planejada — próxima a iniciar**
+**Status: concluída**
 
-Implementar o processo de contagem física já usado por Nicolas (contagem simplificada
-semanal, contagem geral mensal), com checklist impresso por loja e um passo de ajuste
-de estoque (positivo ou negativo) após cada contagem. O cálculo de CMV real seguirá a
-mesma lógica já usada na planilha (estoque inicial + incremento − contagem final =
-consumo, multiplicado pelo preço).
+Nova página `contagem.html`: contagem por loja e por tipo (semanal ou mensal), com
+todos os itens ativos listados e cálculo automático de consumo/CMV por item. Contagem
+mensal exige observação nos itens com diferença antes de liberar o fechamento; a
+semanal não. Cada contagem confirmada ajusta `qty` da loja, grava um novo tipo de
+histórico (`'ajuste'`) e um registro em `data.contagens`. A fórmula de consumo foi
+ajustada durante a validação: `estoqueAnterior − quantidadeContada` (a soma adicional de
+`entradasNoPeriodo` do enunciado original contava a mesma entrada duas vezes, já que a
+`qty` do sistema é atualizada em tempo real pela tela de Entradas). Detalhe completo em
+`CHANGELOG.md`.
+
+Substitui o checklist impresso mencionado na descrição original da fase — a contagem
+agora é feita direto na tela, item por item.
 
 ## Fase 4 — Ajuste manual de pedidos
 **Status: planejada**

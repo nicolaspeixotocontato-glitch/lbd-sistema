@@ -21,8 +21,77 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (Micro Sprint Mobile First primeiro, por
-ser a mais nova — ainda **sem commit**, ver nota na própria entrada).
+Detalhamento das sprints mais recentes abaixo (Fase 3 — Contagem física primeiro, por
+ser a mais nova).
+
+---
+
+## 2026-07-13 — Fase 3: Contagem física de estoque e CMV real
+
+**Objetivo da sprint:** substituir o cálculo manual de consumo/CMV feito hoje na
+planilha por uma tela dentro do sistema, seguindo exatamente o processo que Nicolas já
+usa (contagem simplificada semanal + contagem geral mensal), sem mudar a fórmula nem o
+processo — só tirar isso da planilha.
+
+### Adicionado
+
+- **Nova página `contagem.html`**, no mesmo padrão visual/estrutural de
+  `entradas.html`/`saidas.html`. Acesso liberado para `admin`, `gerente` e `operador`
+  (nova permissão `ver_contagem`, adicionada a `PERMISSOES_POR_PERFIL`) e novo item
+  "Contagem" no menu lateral.
+- **Fluxo de contagem**: escolha de loja (pré-selecionada pela loja ativa/loja do
+  usuário) e tipo (semanal ou mensal); lista todos os itens ativos com a quantidade
+  atual do sistema pré-preenchida no campo de contagem, um campo por item. Busca por
+  nome e filtro por categoria afetam só a exibição — a contagem sempre processa todos
+  os itens ativos, independente do filtro (mesmo padrão já usado em Pedidos).
+- **Cálculo automático por item** (`calcularContagem()`, novo em `assets/app.js`):
+  `entradasNoPeriodo` (net entrada/saída desde a última contagem do mesmo tipo nessa
+  loja, ou desde o início na primeira contagem), `consumoCalculado` (estoque atual menos
+  quantidade contada), `valorConsumo` (consumo × último preço pago, com fallback para o
+  preço unitário cadastrado) e `diferenca` (contado menos estoque atual, só para
+  exibição/sinal).
+- **Regra da contagem mensal**: itens com diferença são destacados na tabela e exigem
+  observação preenchida antes de liberar o botão "Confirmar contagem" — validado tanto
+  na tela (botão desabilitado, contador de pendências) quanto em `registrarContagem()`
+  (rejeita a gravação inteira se faltar observação em algum item). Na contagem semanal
+  a observação não existe.
+- **Novo tipo de histórico `'ajuste'`** (`registrarContagem()`, novo em `assets/app.js`):
+  grava uma linha por item **só quando há diferença** (item sem diferença não gera
+  ruído no histórico), com `motivo: 'contagem'` e `contagemId` apontando para o registro
+  da contagem. `historico.html` (chip/badge "Ajuste (contagem)") e `painel.html`
+  (atividade recente) atualizados para exibir esse tipo corretamente.
+- **Novo array `data.contagens`** (migração automática e não-destrutiva em `getData()`
+  para quem já tinha dados salvos): um registro por contagem confirmada, com todos os
+  itens processados (inclusive os sem diferença), usado pela própria tela para mostrar
+  "Contagens anteriores desta loja" e a data da última contagem de cada tipo.
+
+### Corrigido durante a validação
+
+- **Fórmula de consumo estava contando a mesma entrada duas vezes.** A especificação
+  original somava `estoqueAnterior + entradasNoPeriodo − quantidadeContada`, mas
+  `estoqueAnterior` (a `qty` atual do sistema) já reflete em tempo real as entradas
+  registradas pela tela de Entradas — somar `entradasNoPeriodo` de novo inflava o
+  consumo calculado (reproduzido com um caso real: +20 de entrada, contagem de 18,
+  sistema calculava consumo 22 em vez de 2). Corrigido para `consumoCalculado =
+  estoqueAnterior − quantidadeContada`; `entradasNoPeriodo` continua calculado e exibido,
+  como dado de contexto.
+
+### Fora do escopo desta sprint
+
+- Ficha Técnica / CMV por produto vendido (item maior, futuro, já mapeado em
+  `PROJECT_CONTEXT.md` seção 14.1) — aqui "CMV" é só o valor de consumo de insumos.
+- Nenhum threshold automático de "diferença grave" — só o destaque visual e a
+  observação obrigatória na contagem mensal.
+- `entradas.html`, `saidas.html` e `transferencias.html` não foram alterados além do
+  necessário para o novo tipo de histórico.
+
+### Verificação
+
+Testado em servidor local (login como admin, LBD01): contagem semanal e contagem
+mensal, item com diferença positiva e item com diferença negativa, bloqueio de
+fechamento mensal sem observação (confirmado que nada é gravado até a observação ser
+preenchida), `qty[loja]` e `historico` conferidos diretamente no `localStorage` após
+salvar. Nenhum erro de console.
 
 ---
 
