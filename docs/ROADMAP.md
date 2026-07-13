@@ -67,10 +67,19 @@ Substitui o checklist impresso mencionado na descrição original da fase — a 
 agora é feita direto na tela, item por item.
 
 ## Fase 4 — Ajuste manual de pedidos
-**Status: planejada**
+**Status: concluída**
 
-Permitir ajuste manual da quantidade sugerida automaticamente pelo sistema, para cobrir
-datas sazonais com demanda maior que o normal. Depende da Fase 3 estar concluída.
+`pedidos.html`, seção "Por fornecedor": nova coluna "Pedido" (editável, aceita
+decimais) ao lado de "Sugerido" (só leitura, fórmula inalterada), com indicador visual
+quando os dois valores divergem. Resumo executivo, resumo da seleção, mensagem de
+WhatsApp e exportação CSV passam a usar o valor de "Pedido". Ajuste é só em memória
+(mesmo padrão da seleção de itens e da observação do pedido) — sobrevive à troca de
+filtro, mas reseta num reload completo da página, como pedido. A seção "Por loja" não
+ganhou campo editável (decisão explícita, para não ter dois estados de ajuste do mesmo
+item desincronizados entre si — ver `CHANGELOG.md`). Um bug pré-existente foi
+observado durante a validação (rótulo "Sem fornecedor cadastrado" aparecendo errado
+para fornecedores `tipo: 'direto'`) e registrado no `CHANGELOG.md` para correção
+futura, sem ser corrigido nesta sprint.
 
 ## Fase 5 — Fluxos especiais (Duplex, Divine, Câmara Fria)
 **Status: dispensada**

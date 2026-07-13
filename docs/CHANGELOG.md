@@ -21,8 +21,62 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (correções pós-teste da Contagem
+Detalhamento das sprints mais recentes abaixo (Fase 4 — Ajuste manual de pedidos
 primeiro, por ser a mais nova).
+
+---
+
+## 2026-07-13 — Fase 4: Ajuste manual de quantidade em Pedidos
+
+**Objetivo:** permitir ajustar manualmente a quantidade a comprar de cada item na
+seção "Por fornecedor" de `pedidos.html`, para cobrir datas sazonais com demanda maior
+que o normal, sem mudar a fórmula de cálculo do valor sugerido.
+
+### Adicionado
+
+- **Colunas "Sugerido" e "Pedido"** na tabela "Por fornecedor": "Sugerido" continua
+  mostrando `Math.max(min - atual, 0)`, só leitura, sem mudança na fórmula. "Pedido" é
+  um campo numérico editável (aceita decimais — `step="0.01"`, sem arredondar, pensado
+  para itens em `kg`/`L`), pré-preenchido com o valor sugerido.
+- **Indicador visual discreto** (ícone pequeno, cor de alerta) ao lado do campo quando
+  "Pedido" ≠ "Sugerido" — some sozinho quando o valor volta a bater com o sugerido.
+- **Tudo que usava a quantidade sugerida passa a usar o valor de "Pedido"**: resumo
+  executivo, resumo da seleção, mensagem do WhatsApp por fornecedor e exportação CSV.
+  A ordenação por criticidade continua usando o status atual do item
+  (`getCriticidade`), não o valor ajustado — como pedido.
+- **Estado só em memória** (`ajustesQtd`, objeto `itemId → quantidade`), no mesmo
+  padrão já usado para seleção de itens e observação do pedido — nunca é salvo no
+  `localStorage`. Sobrevive à troca de filtro (loja/fornecedor/categoria) dentro da
+  mesma sessão de tela; um reload completo da página volta tudo ao valor sugerido.
+- **Seção "Por loja" não foi alterada** — continua mostrando só a quantidade sugerida,
+  sem campo editável. Decisão explícita: essa seção é só uma lista de referência por
+  loja (linha por loja, sem ações de seleção/WhatsApp/CSV atreladas), enquanto "Por
+  fornecedor" é a visão que de fato alimenta a compra — evita dois estados de ajuste
+  para o mesmo item desincronizados entre si.
+- Atualização parcial do DOM ao digitar (só o badge do indicador e o rodapé do bloco
+  do fornecedor, sem reconstruir a tabela inteira) — evita perder o foco do campo a
+  cada tecla digitada, mesmo padrão já usado na tela de Contagem.
+
+### Observado durante a validação (fora do escopo desta sprint, não corrigido aqui)
+
+- `labelTipoFornecedor()` em `pedidos.html` só reconhece fornecedor `tipo: 'atacado'`
+  ou `'fornecedor'` — qualquer fornecedor com `tipo: 'direto'` (a maioria dos 21
+  fornecedores reais cadastrados na Fase 1, ex.: MSX, Pamplona, CEASA) cai no `return`
+  padrão da função e exibe o badge **"Sem fornecedor cadastrado"**, mesmo sendo um
+  fornecedor cadastrado normalmente. É um bug pré-existente (rótulo incorreto, não
+  afeta cálculo/agrupamento), fora do escopo pedido para esta sprint — registrado aqui
+  para correção futura.
+
+### Verificação
+
+Testado em servidor local com itens de estoque simulados (min/qty preenchidos
+manualmente via console, já que o catálogo real ainda está zerado): ajuste de um item
+`un` pra cima (Abacaxi, 8→12) e de um item `kg` pra baixo com decimal (Bacon,
+15→12,5); confirmado que a mensagem de WhatsApp e o total do rodapé refletem os
+valores ajustados, não os sugeridos; confirmado que trocar o filtro de categoria não
+apaga os ajustes de itens que continuam visíveis; confirmado que recarregar a página
+volta tudo ao valor sugerido; confirmado que valor negativo digitado no campo é
+corrigido para 0 (tanto no cálculo quanto no campo exibido).
 
 ---
 

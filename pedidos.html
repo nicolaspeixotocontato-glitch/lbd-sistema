@@ -45,6 +45,27 @@
     .chk-col {
       width: 36px;
     }
+
+    .input-pedido-qtd {
+      max-width: 100px;
+    }
+
+    .pedido-qtd-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ajuste-indicador {
+      display: inline-flex;
+      color: var(--warning);
+      flex-shrink: 0;
+    }
+
+    .ajuste-indicador svg {
+      width: 14px;
+      height: 14px;
+    }
   </style>
 </head>
 <body>
@@ -122,8 +143,20 @@
     let filtroCategoriaPedidos = 'todas';
     let blocosFornecedorAtuais = [];
 
+    // Ajuste manual de quantidade (Fase 4): itemId -> quantidade "Pedido" digitada
+    // pelo usuário, só para esta sessão de tela — nunca salva no localStorage.
+    // Some ausente = usa o valor "Sugerido" (Math.max(min - atual, 0)) normalmente.
+    let ajustesQtd = {};
+
     const FORNECEDOR_SEM_ID = 'sem-fornecedor';
     const FORNECEDOR_SEM_CADASTRO = { id: FORNECEDOR_SEM_ID, nome: 'Sem fornecedor definido', tipo: null };
+
+    // Quantidade efetivamente usada em qualquer cálculo/exportação: o ajuste manual
+    // se existir, senão o valor sugerido (l.qtd) calculado normalmente.
+    function qtdEfetiva(l) {
+      const ajuste = ajustesQtd[l.item.id];
+      return ajuste !== undefined ? ajuste : l.qtd;
+    }
 
     /* ==========================================================================
        Cálculo de dados (funções puras, sem tocar no DOM)
@@ -205,7 +238,7 @@
             (pior, l) => (CRITICIDADE_ORDEM[l.piorNivel] > CRITICIDADE_ORDEM[pior] ? l.piorNivel : pior),
             'baixo'
           );
-          const valorTotal = itens.reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+          const valorTotal = itens.reduce((acc, l) => acc + qtdEfetiva(l) * precoEstimado(l.item), 0);
           return { fornecedor: f, itens, piorNivelBloco, valorTotal };
         });
 
@@ -253,7 +286,7 @@
       const linhas = linhasPendentes || getTodosItensPendentes();
       const criticos = linhas.filter((l) => l.piorNivel === 'critico').length;
       const fornecedoresSet = new Set(linhas.map((l) => l.item.fornecedorId || FORNECEDOR_SEM_ID));
-      const valorTotal = linhas.reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+      const valorTotal = linhas.reduce((acc, l) => acc + qtdEfetiva(l) * precoEstimado(l.item), 0);
 
       const cards = [
         { label: 'Itens a repor', value: fmt(linhas.length), icon: ICONS.estoque, variant: 'mint' },
@@ -284,8 +317,9 @@
       const fornecedoresEnvolvidos = new Set();
 
       selecionadas.forEach((l) => {
-        qtdPorUnidade[l.item.un] = (qtdPorUnidade[l.item.un] || 0) + l.qtd;
-        valorTotal += l.qtd * precoEstimado(l.item);
+        const qtd = qtdEfetiva(l);
+        qtdPorUnidade[l.item.un] = (qtdPorUnidade[l.item.un] || 0) + qtd;
+        valorTotal += qtd * precoEstimado(l.item);
         fornecedoresEnvolvidos.add(l.item.fornecedorId || FORNECEDOR_SEM_ID);
       });
 
@@ -501,19 +535,28 @@
         const itensSelecionadosCount = itemIds.filter((id) => itensSelecionados.has(id)).length;
         const valorSelecionado = bloco.itens
           .filter((l) => itensSelecionados.has(l.item.id))
-          .reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+          .reduce((acc, l) => acc + qtdEfetiva(l) * precoEstimado(l.item), 0);
 
         const linhasHtml = bloco.itens.map((l) => {
           const marcado = itensSelecionados.has(l.item.id);
           const indicador = getIndicadorPreco(l.item.id);
           const precoUltimo = precoEstimado(l.item);
+          const pedido = qtdEfetiva(l);
+          const ajustado = pedido !== l.qtd;
 
           return `
-            <tr>
+            <tr data-pedido-item-id="${l.item.id}">
               <td><input type="checkbox" class="chk-item-pedido" aria-label="Selecionar ${l.item.nome}" ${marcado ? 'checked' : ''} onchange="toggleItemSelecionado('${l.item.id}')"></td>
               <td>${htmlBadgeCriticidade(l.piorNivel)}</td>
               <td>${l.item.nome}</td>
               <td class="td-num">${fmt(l.qtd)} ${l.item.un}</td>
+              <td>
+                <div class="pedido-qtd-cell">
+                  <input type="number" class="form-input input-pedido-qtd" min="0" step="0.01" value="${pedido}" data-item-id="${l.item.id}" aria-label="Quantidade a pedir de ${l.item.nome}">
+                  <span class="text-muted">${l.item.un}</span>
+                  <span class="ajuste-indicador" title="Quantidade ajustada manualmente" style="display:${ajustado ? '' : 'none'}">${ICONS.edit}</span>
+                </div>
+              </td>
               <td class="td-num">${fmtR(precoUltimo)}</td>
               <td>
                 <span class="preco-indicador is-${indicador.status}">
@@ -541,7 +584,8 @@
                     <th class="chk-col"></th>
                     <th>Criticidade</th>
                     <th>Item</th>
-                    <th class="td-num">Qtd. a pedir</th>
+                    <th class="td-num">Sugerido</th>
+                    <th>Pedido</th>
                     <th class="td-num">Último preço pago</th>
                     <th>Tendência</th>
                   </tr>
@@ -550,13 +594,65 @@
               </table>
             </div>
             <div class="card-footer flex items-center justify-between" style="flex-wrap:wrap; gap:8px;">
-              <span style="font-weight:600">${itensSelecionadosCount}/${itemIds.length} selecionados — Total: ${fmtR(valorSelecionado)}</span>
+              <span style="font-weight:600" data-fornecedor-footer="${f.id}">${itensSelecionadosCount}/${itemIds.length} selecionados — Total: ${fmtR(valorSelecionado)}</span>
               <button class="btn btn-secondary btn-sm" type="button" onclick="copiarPedidoWhatsApp('${f.id}')" ${itensSelecionadosCount === 0 ? 'disabled' : ''}>Copiar para WhatsApp</button>
             </div>
           </div>
         `;
       }).join('');
     }
+
+    // Ajuste manual de quantidade (Fase 4): atualiza só a linha/rodapé afetados,
+    // sem reconstruir a tabela inteira — evita perder o foco do campo enquanto digita.
+    function atualizarLinhaPedidoAjustada(itemId) {
+      let linha = null;
+      let blocoAtual = null;
+      for (const bloco of blocosFornecedorAtuais) {
+        const encontrada = bloco.itens.find((l) => l.item.id === itemId);
+        if (encontrada) {
+          linha = encontrada;
+          blocoAtual = bloco;
+          break;
+        }
+      }
+      if (!linha || !blocoAtual) return;
+
+      const ajustado = qtdEfetiva(linha) !== linha.qtd;
+      const row = document.querySelector(`tr[data-pedido-item-id="${itemId}"]`);
+      if (row) {
+        const indicador = row.querySelector('.ajuste-indicador');
+        if (indicador) indicador.style.display = ajustado ? '' : 'none';
+      }
+
+      const itemIds = blocoAtual.itens.map((l) => l.item.id);
+      const itensSelecionadosCount = itemIds.filter((id) => itensSelecionados.has(id)).length;
+      const valorSelecionado = blocoAtual.itens
+        .filter((l) => itensSelecionados.has(l.item.id))
+        .reduce((acc, l) => acc + qtdEfetiva(l) * precoEstimado(l.item), 0);
+
+      const footer = document.querySelector(`[data-fornecedor-footer="${blocoAtual.fornecedor.id}"]`);
+      if (footer) {
+        footer.textContent = `${itensSelecionadosCount}/${itemIds.length} selecionados — Total: ${fmtR(valorSelecionado)}`;
+      }
+
+      renderResumoExecutivo();
+      atualizarResumoSelecao();
+    }
+
+    document.getElementById('pedidos-por-fornecedor').addEventListener('input', (e) => {
+      const el = e.target;
+      if (!el.classList.contains('input-pedido-qtd')) return;
+
+      const itemId = el.dataset.itemId;
+      let valor = Number(el.value);
+      if (!Number.isFinite(valor) || valor < 0) {
+        valor = 0;
+        el.value = 0; // corrige só quando inválido/negativo — não mexe no campo durante digitação normal (ex: "12." antes do decimal)
+      }
+      ajustesQtd[itemId] = valor;
+
+      atualizarLinhaPedidoAjustada(itemId);
+    });
 
     /* ==========================================================================
        Acréscimo 2 — Observação + Acréscimo A6 — Copiar para WhatsApp
@@ -566,8 +662,8 @@
       const itensDoBlocoSelecionados = bloco.itens.filter((l) => itensSelecionados.has(l.item.id));
       if (itensDoBlocoSelecionados.length === 0) return null;
 
-      const linhasTexto = itensDoBlocoSelecionados.map((l) => `• ${l.item.nome} — ${fmt(l.qtd)} ${l.item.un}`).join('\n');
-      const valorTotal = itensDoBlocoSelecionados.reduce((acc, l) => acc + l.qtd * precoEstimado(l.item), 0);
+      const linhasTexto = itensDoBlocoSelecionados.map((l) => `• ${l.item.nome} — ${fmt(qtdEfetiva(l))} ${l.item.un}`).join('\n');
+      const valorTotal = itensDoBlocoSelecionados.reduce((acc, l) => acc + qtdEfetiva(l) * precoEstimado(l.item), 0);
       const observacao = document.getElementById('observacao-pedido').value.trim();
 
       let mensagem = `Pedido — ${bloco.fornecedor.nome}\n\n${linhasTexto}\n\nTotal estimado: ${fmtR(valorTotal)}`;
@@ -635,16 +731,17 @@
         bloco.itens.forEach((l) => {
           if (!itensSelecionados.has(l.item.id)) return;
           const precoUltimo = precoEstimado(l.item);
+          const qtd = qtdEfetiva(l);
           linhasCsv.push([
             bloco.fornecedor.nome,
             bloco.fornecedor.tipo === 'atacado' ? 'Compra no atacado' : bloco.fornecedor.tipo === 'fornecedor' ? 'Pedido direto' : 'Sem fornecedor cadastrado',
             l.item.nome,
             l.item.cat,
-            l.qtd,
+            qtd,
             l.item.un,
             criticidadeBadge(l.piorNivel).label,
             precoUltimo.toFixed(2),
-            (l.qtd * precoUltimo).toFixed(2),
+            (qtd * precoUltimo).toFixed(2),
           ]);
         });
       });

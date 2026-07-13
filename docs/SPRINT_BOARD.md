@@ -12,6 +12,15 @@
 
 ## Concluído recentemente
 
+- [x] Fase 4 — ajuste manual de quantidade em Pedidos (`pedidos.html`, seção "Por
+      fornecedor"): colunas "Sugerido"/"Pedido", indicador visual de ajuste, resumo
+      executivo/seleção/WhatsApp/CSV usando o valor ajustado, estado só em memória —
+      implementada e validada em servidor local. Bug pré-existente encontrado durante
+      a validação (`labelTipoFornecedor` não reconhece fornecedor `tipo: 'direto'`),
+      registrado no `CHANGELOG.md`, não corrigido nesta sprint (fora de escopo).
+- [x] Correções pós-teste da Fase 3 (Contagem): busca sem acentuação
+      (`normalizarBusca()` compartilhada), badge de diferença com largura fixa,
+      rascunho persistente isolado por usuário — validado em servidor local.
 - [x] Fase 3 — tela de Contagem física (semanal/mensal), cálculo automático de
       consumo/CMV e ajuste de estoque (`contagem.html`, novo tipo de histórico
       `'ajuste'`, novo array `data.contagens`) — implementada e validada em servidor
@@ -31,7 +40,8 @@
 
 - [ ] Formalizar o processo de entrega padrão (prompt → execução → validação técnica
       em produção com hard refresh → registro no changelog e no roadmap).
-- [ ] Iniciar Fase 4 — ajuste manual de pedidos.
+- [ ] Corrigir `labelTipoFornecedor()` em `pedidos.html` para reconhecer fornecedor
+      `tipo: 'direto'` (hoje cai no rótulo errado "Sem fornecedor cadastrado").
 - [ ] Revisar os débitos técnicos remanescentes listados em `PROJECT_CONTEXT.md`.
 - [ ] Decidir o que fazer com `0001-fix-mobile-responsavel.patch` (arquivo solto,
       não rastreado pelo Git, na raiz do projeto — aparenta ser resíduo de uma
