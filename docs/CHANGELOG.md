@@ -56,6 +56,10 @@ que o normal, sem mudar a fórmula de cálculo do valor sugerido.
 - Atualização parcial do DOM ao digitar (só o badge do indicador e o rodapé do bloco
   do fornecedor, sem reconstruir a tabela inteira) — evita perder o foco do campo a
   cada tecla digitada, mesmo padrão já usado na tela de Contagem.
+- **Preço na mensagem do WhatsApp**: cada linha de item passa a mostrar o último
+  preço pago (`precoEstimado`) e o rótulo da tendência (`getIndicadorPreco` +
+  `labelIndicadorPreco`, o mesmo já exibido na tela — "Pagando caro"/"Preço
+  médio"/"Preço bom"), formato `Nome — Qtd UN (último preço: R$ X,XX — Rótulo)`.
 
 ### Observado durante a validação (fora do escopo desta sprint, não corrigido aqui)
 
@@ -76,7 +80,9 @@ manualmente via console, já que o catálogo real ainda está zerado): ajuste de
 valores ajustados, não os sugeridos; confirmado que trocar o filtro de categoria não
 apaga os ajustes de itens que continuam visíveis; confirmado que recarregar a página
 volta tudo ao valor sugerido; confirmado que valor negativo digitado no campo é
-corrigido para 0 (tanto no cálculo quanto no campo exibido).
+corrigido para 0 (tanto no cálculo quanto no campo exibido); confirmado, com um item
+de cada categoria de indicador de preço, que a mensagem de WhatsApp mostra o preço e
+o rótulo corretos para "Pagando caro", "Preço médio" e "Preço bom".
 
 ---
 

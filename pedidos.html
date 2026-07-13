@@ -662,7 +662,10 @@
       const itensDoBlocoSelecionados = bloco.itens.filter((l) => itensSelecionados.has(l.item.id));
       if (itensDoBlocoSelecionados.length === 0) return null;
 
-      const linhasTexto = itensDoBlocoSelecionados.map((l) => `• ${l.item.nome} — ${fmt(qtdEfetiva(l))} ${l.item.un}`).join('\n');
+      const linhasTexto = itensDoBlocoSelecionados.map((l) => {
+        const indicador = getIndicadorPreco(l.item.id);
+        return `• ${l.item.nome} — ${fmt(qtdEfetiva(l))} ${l.item.un} (último preço: ${fmtR(precoEstimado(l.item))} — ${labelIndicadorPreco(indicador.status)})`;
+      }).join('\n');
       const valorTotal = itensDoBlocoSelecionados.reduce((acc, l) => acc + qtdEfetiva(l) * precoEstimado(l.item), 0);
       const observacao = document.getElementById('observacao-pedido').value.trim();
 
