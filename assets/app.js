@@ -10,7 +10,7 @@ const APP_VERSION = '1.0.0';
 
 const LOJAS = [
   { id: 'LBD01', nome: 'Cristóvão', label: 'LBD01 – Cristóvão' },
-  { id: 'LBD02', nome: 'Zona Sul', label: 'LBD02 – Zona Sul' },
+  { id: 'LBD02', nome: 'Nonoai', label: 'LBD02 – Nonoai' },
   { id: 'LBD03', nome: 'Nova Loja', label: 'LBD03 – Nova Loja' },
 ];
 
@@ -32,14 +32,27 @@ const CATEGORIAS = [
 ];
 
 const FORNECEDORES = [
-  { id: 'f1', nome: 'Laticínios Vale Verde', tipo: 'fornecedor' },
-  { id: 'f2', nome: 'Frios & Cia Distribuidora', tipo: 'fornecedor' },
-  { id: 'f3', nome: 'Hortifruti Bom Preço', tipo: 'fornecedor' },
-  { id: 'f4', nome: 'Distribuidora Bebidas Sul', tipo: 'fornecedor' },
-  { id: 'f5', nome: 'Assaí Atacadista', tipo: 'atacado' },
-  { id: 'f6', nome: 'Makro Atacado', tipo: 'atacado' },
-  { id: 'f7', nome: 'Doce Sabor Insumos', tipo: 'fornecedor' },
-  { id: 'f8', nome: 'Padaria Trigo Dourado', tipo: 'fornecedor' },
+  { id: 'ceasa', nome: 'CEASA', tipo: 'direto' },
+  { id: 'pamplona', nome: 'Pamplona', tipo: 'direto' },
+  { id: 'msx', nome: 'MSX', tipo: 'direto' },
+  { id: 'dellys', nome: 'Dellys', tipo: 'direto' },
+  { id: 'kem', nome: 'Kem', tipo: 'direto' },
+  { id: 'atacado', nome: 'Atacado', tipo: 'atacado' },
+  { id: 'novomix', nome: 'Novo Mix', tipo: 'direto' },
+  { id: 'senar', nome: 'Senar', tipo: 'direto' },
+  { id: 'frumar', nome: 'Frumar', tipo: 'direto' },
+  { id: 'gcn', nome: 'GCN', tipo: 'direto' },
+  { id: 'divine', nome: 'Divine', tipo: 'direto' },
+  { id: 'duplex', nome: 'Duplex', tipo: 'direto' },
+  { id: 'embnascimento', nome: 'Emb. Nascimento', tipo: 'direto' },
+  { id: 'jbembalagens', nome: 'JB Embalagens', tipo: 'direto' },
+  { id: 'queijoecia', nome: 'Queijo & Cia', tipo: 'direto' },
+  { id: 'triangulo', nome: 'Triângulo', tipo: 'direto' },
+  { id: 'fruki', nome: 'Fruki', tipo: 'direto' },
+  { id: 'teresa', nome: 'Teresa', tipo: 'direto' },
+  { id: 'fensa', nome: 'Fensa', tipo: 'direto' },
+  { id: 'americanas', nome: 'Americanas', tipo: 'atacado' },
+  { id: 'samsclub', nome: "Sam's Club", tipo: 'atacado' }
 ];
 
 const MOTIVOS_SAIDA = [
