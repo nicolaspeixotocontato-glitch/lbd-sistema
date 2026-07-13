@@ -21,8 +21,75 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (Sprint 2 — Central de Compras primeiro,
-por ser a mais nova).
+Detalhamento das sprints mais recentes abaixo (Micro Sprint Mobile First primeiro, por
+ser a mais nova — ainda **sem commit**, ver nota na própria entrada).
+
+---
+
+## 2026-07-13 — Micro Sprint Mobile First
+
+**Objetivo da sprint:** melhorar exclusivamente a experiência em celulares e tablets
+(360–1024px) — sem adicionar funcionalidades novas, sem alterar regra de negócio, sem
+tocar em `assets/app.js` nem nos documentos executivos. Escopo: `assets/style.css` e as
+8 páginas operacionais (Painel, Estoque, Entradas, Saídas, Transferências, Histórico,
+Pedidos, Etiquetas).
+
+> **Nota:** esta sprint foi implementada e validada, mas **não foi commitada nem
+> enviada ao GitHub** — instrução explícita desta rodada. Os arquivos alterados
+> continuam como mudanças locais não commitadas.
+
+### Corrigido
+
+- **Tabelas quebravam texto em várias linhas dentro das células** (`.table td` não
+  tinha `white-space: nowrap`, ao contrário de `.table th`) — em telas estreitas, nomes
+  de item e categoria ficavam ilegíveis, quebrados caractere a caractere dentro da
+  coluna, em vez de manter uma linha e acionar o scroll horizontal que `.table-wrap` já
+  oferece. Afetava **todas** as tabelas do sistema (Estoque, Histórico, Pedidos,
+  Etiquetas). Corrigido adicionando `white-space: nowrap` a `.table td`.
+- **Topbar estourava a altura fixa em telas muito estreitas** (~360–400px): "La Bella
+  Donna" e o nome da loja quebravam para 2 linhas ao mesmo tempo, ultrapassando os 52px
+  de altura do topbar (confirmado via `scrollHeight > clientHeight`). Corrigido: texto
+  do logo e da loja truncam com reticências em vez de quebrar; a versão (`v1.0.0`),
+  informação de menor prioridade, some em telas pequenas para sobrar espaço.
+- **Botões de rodapé cortados/sobrepostos** — em Transferências, o botão "Confirmar
+  transferência" ficava com o texto cortado ao lado de "Limpar formulário" (confirmado
+  via overflow horizontal do `.card-footer`). O mesmo padrão existe em outras 5 páginas
+  (Estoque, Entradas, Etiquetas, Saídas, além de Transferências). Corrigido permitindo
+  que `.card-header`/`.card-footer` quebrem para a linha de baixo em telas pequenas —
+  sem efeito em desktop, onde já cabem numa linha só.
+- **Campo de busca praticamente inutilizável ao lado de um botão**: em Estoque/Histórico
+  ("Buscar..." + "Limpar filtros") e em Saídas/Entradas ("Buscar item"/seleção de item +
+  "Escanear"), o campo principal ficava espremido a ~130–180px de largura. Corrigido:
+  em telas pequenas, o campo passa a ocupar a linha inteira e o botão desce para a linha
+  de baixo (nova classe `.mobile-stack-row`, aplicada em `saidas.html` e `entradas.html`;
+  `.search-input` ajustado globalmente para Estoque/Histórico).
+
+### Alterado
+
+- **Alvos de toque aumentados em mobile/tablet**: `.btn-icon.btn-sm` (ícones de
+  editar/excluir em Estoque, botões −/+ de quantidade em Saídas, remover item em
+  Entradas) passa de 28×28px para 40×40px; checkboxes nativos (Etiquetas, Pedidos)
+  passam do tamanho padrão do navegador (~13px) para 20×20px.
+
+### Não alterado (fora do escopo desta sprint)
+
+- Rolagem horizontal de tabelas em telas estreitas — já era o comportamento correto e
+  esperado (`.table-wrap { overflow-x: auto }`); não é um problema, só ficou mais visível
+  depois da correção do `white-space: nowrap`.
+- `.input-clear-btn` (botão "×" de limpar busca, 22×22px) — touch target pequeno, mas
+  ação secundária; ficou para uma sprint futura.
+- Reorganizar os ~16 chips de categoria do Estoque num dropdown/accordion para reduzir
+  rolagem vertical — mudança estrutural maior, avaliada e descartada para esta *micro*
+  sprint (mantém o componente existente, só ajusta espaçamento/toque).
+
+### Verificação
+
+Testado visualmente em servidor local, nas 8 páginas do escopo, em três condições:
+**Portrait** (360×800), **Landscape** (812×375 e 640×360) e **Tablet** (768×1024) —
+além de uma conferência em Desktop (1280×800) para confirmar que nada mudou fora dos
+breakpoints mobile. Todas as correções confirmadas via inspeção de layout
+(`getBoundingClientRect`, `scrollWidth`/`scrollHeight`) além de captura visual. Nenhum
+erro de console em nenhuma página/resolução.
 
 ---
 

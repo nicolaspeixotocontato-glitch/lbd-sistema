@@ -666,6 +666,7 @@ table {
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .table tbody tr {
@@ -1563,4 +1564,98 @@ table {
 
 .mb-16 {
   margin-bottom: 16px;
+}
+
+/* ==========================================================================
+   Micro Sprint Mobile First (2026-07-13)
+   Ajustes de toque, espaçamento e responsividade — reaproveita componentes
+   já existentes, sem criar nenhum componente novo.
+   ========================================================================== */
+
+/* Card header/footer: em vez de cortar/sobrepor botões e badges quando não
+   cabem lado a lado (ex.: "Confirmar transferência" + "Limpar formulário"),
+   permite quebrar para a linha de baixo. Não afeta nada quando já cabe. */
+@media (max-width: 768px) {
+  .card-header,
+  .card-footer {
+    flex-wrap: wrap;
+  }
+}
+
+/* Alvos de toque maiores em telas pequenas/tablets: os ícones de
+   editar/excluir (Estoque), os botões −/+ de quantidade (Saídas) e o botão
+   de remover item (Entradas) usam .btn-icon.btn-sm (28×28px no desktop,
+   pequeno demais para o dedo). Checkboxes nativos (Etiquetas, Pedidos)
+   também ficam maiores. */
+@media (max-width: 768px) {
+  .btn-icon.btn-sm {
+    width: 40px;
+    height: 40px;
+  }
+
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Topbar: em telas muito estreitas, o nome da loja e "La Bella Donna"
+   quebravam para 2 linhas ao mesmo tempo, estourando a altura fixa do
+   topbar. Trunca com reticências em vez de quebrar, e esconde a versão
+   (informação de menor prioridade) para sobrar espaço. */
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .topbar-left {
+    gap: 8px;
+  }
+
+  .topbar-right > span {
+    display: none;
+  }
+
+  .logo {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .logo-text {
+    font-size: var(--fs-14);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .store-selector {
+    min-width: 0;
+    max-width: 38vw;
+    padding: 6px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+}
+
+/* Campo de busca ao lado de um botão (Estoque/Histórico: busca + "Limpar
+   filtros"; Saídas/Entradas: busca/seleção de item + "Escanear"): em telas
+   pequenas os dois espremiam um ao outro. Cada um passa a ocupar a linha
+   inteira, empilhados. */
+@media (max-width: 480px) {
+  .search-input {
+    flex-basis: 100% !important;
+    max-width: none !important;
+  }
+
+  .mobile-stack-row {
+    flex-wrap: wrap;
+  }
+
+  .mobile-stack-row > *:first-child {
+    flex: 1 1 100% !important;
+  }
 }

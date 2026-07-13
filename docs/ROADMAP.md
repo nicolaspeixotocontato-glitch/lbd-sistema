@@ -40,6 +40,17 @@ corretamente, e uma bandeja de ovos duplicada removida do catálogo ativo.
 Remoção do recurso de leitura de cupom fiscal por foto (IA), que ainda não estava em
 uso e mantinha uma chave de API em texto puro no navegador do usuário.
 
+## Sprint extra — Micro Sprint Mobile First (UX)
+**Status: concluída (implementação e validação) — pendente de commit**
+
+Melhorias de experiência em celulares e tablets (360–1024px) em `assets/style.css`
+e nas 8 páginas operacionais: tabelas sem quebra de texto ilegível, topbar sem
+estourar altura em telas estreitas, botões de rodapé sem corte, campo de busca
+ocupando a linha inteira em mobile, alvos de toque maiores. Sem novas
+funcionalidades e sem alteração de regra de negócio. Detalhes em `CHANGELOG.md`
+(13/07/2026). Trabalho validado localmente, mas ainda **não commitado nem
+enviado ao GitHub** — ver `SPRINT_BOARD.md`, seção "Bloqueios ativos".
+
 ## Fase 3 — Contagem física e CMV real
 **Status: planejada — próxima a iniciar**
 
