@@ -3,47 +3,53 @@
 > Uma página, sem termos técnicos. Pra quem quer saber "como está o projeto" sem
 > precisar ler código ou documentação técnica. Atualize sempre que o progresso mudar
 > de forma relevante — o valor deste documento está em ele estar sempre atual.
-> Última atualização: 13/07/2026 — Progresso geral: **60%**
+> Última atualização: 18/07/2026 — Progresso geral: **75%**
 
 ## Onde estamos
 
-O sistema já está rodando com dados reais da operação: os 152 itens de verdade (não
-mais itens de teste), os 21 fornecedores reais, e os nomes corretos das lojas
-(incluindo "LBD02 – Nonoai"). Um problema de segurança que existia (uma chave de acesso
-guardada de forma exposta no navegador) já foi eliminado.
+O sistema roda com dados reais da operação (152 itens, 21 fornecedores, nomes corretos
+das lojas) e agora cobre o ciclo completo de compra: contagem física de estoque,
+cálculo automático de consumo/custo, e montagem de pedido por fornecedor com ajuste
+manual de quantidade — as duas frentes que faltavam desde a última atualização deste
+resumo já estão prontas e publicadas.
 
 ## O que mudou recentemente
 
-- Catálogo de itens trocado de fictício para real, com categorias específicas por tipo
-  de produto (carnes, queijos, hortifruti, limpeza, etc.), ao invés de categorias
-  genéricas.
-- Correção de dois itens que estavam classificados errado (itens enlatados marcados
-  como hortifruti fresco) e remoção de um item duplicado.
-- Lista de fornecedores e nome da segunda loja corrigidos — essa mudança tinha sido
-  pedida antes, mas não tinha sido executada de fato; foi corrigida agora depois de uma
-  checagem técnica.
-- Removido um recurso que ainda não era usado (leitura de cupom fiscal por foto) e que
-  representava um risco de segurança desnecessário.
-- Criado um painel de acompanhamento ao vivo, acessível por link direto, mostrando o
-  progresso de cada etapa do projeto sem precisar desta conversa.
+- **Contagem física de estoque** (Fase 3): nova tela onde qualquer gerente ou chefe de
+  cozinha registra a contagem semanal ou mensal de cada loja. O sistema calcula
+  sozinho o consumo de cada item e ajusta o estoque automaticamente — substitui a
+  conta feita hoje na planilha. Na contagem mensal, itens com diferença (sobrou ou
+  faltou mais do que devia) ficam destacados e exigem uma anotação do motivo antes de
+  fechar, virando um registro de investigação ao longo do tempo, não só um número.
+- **Ajuste manual de pedidos** (Fase 4): na tela de Pedidos, a quantidade sugerida
+  automaticamente pelo sistema agora pode ser ajustada na hora de montar o pedido
+  (útil pra datas de demanda maior, como feriados). A mensagem enviada pro fornecedor
+  via WhatsApp também passou a mostrar o último preço pago e se está caro, médio ou
+  bom — informação que antes só aparecia dentro do sistema.
+- Melhorias de uso no celular/tablet (tabelas, botões e campos de busca que ficavam
+  ruins de usar em telas pequenas).
 
 ## Riscos e pendências mais importantes agora
 
-1. **Dados de estoque ainda não preenchidos.** O catálogo real está no sistema, mas os
-   números de estoque mínimo e quantidade atual de cada item ainda estão zerados —
-   precisam ser preenchidos na tela de Estoque para os pedidos automáticos funcionarem.
-2. **Documentação e processo em construção.** Estamos formalizando como o projeto é
-   documentado e como cada mudança é validada, para reduzir dependência de memória de
-   conversa e evitar que algo pedido "fique perdido" sem ninguém notar (como aconteceu
-   com a correção de fornecedores).
+1. **Dados de estoque mínimo ainda não preenchidos na maioria dos itens.** Boa parte
+   do catálogo real ainda está com "estoque mínimo" zerado — sem esse número
+   preenchido por item e por loja, a tela de Pedidos não consegue sugerir o que
+   comprar (ela calcula com base nesse mínimo). Esse é o principal motivo pelo qual a
+   tela de Pedidos pode parecer "vazia" hoje, mesmo estando pronta e testada.
+2. **Um fornecedor pode aparecer com etiqueta errada em Pedidos.** Fornecedores
+   cadastrados como "venda direta" (a maioria dos 21 reais) aparecem com o aviso
+   "Sem fornecedor cadastrado", mesmo estando cadastrados normalmente — é só um erro
+   de rótulo visual, não afeta o pedido em si. Já identificado, correção simples ainda
+   não feita.
 3. **Débitos técnicos catalogados, ainda não resolvidos.** O sistema roda inteiramente
-   no navegador (sem servidor próprio), o que significa: sem backup automático, sem
-   sincronização entre aparelhos, e senhas simples. Isso é aceitável para o estágio
-   atual do projeto, mas deve ser revisto conforme a operação cresce (ex: terceira loja
-   abrindo).
+   no navegador (sem servidor próprio): sem backup automático, sem sincronização entre
+   aparelhos, senhas simples. Aceitável para o estágio atual, mas deve ser revisto
+   conforme a operação cresce (ex: terceira loja abrindo).
 
 ## O que vem a seguir
 
-Começar a Fase 3: o processo de contagem física de estoque (a mesma rotina que já é
-feita hoje, de forma manual) e o cálculo automático de custo real, integrado ao
-sistema.
+Não há uma próxima fase numerada definida ainda — as 5 fases originais do plano estão
+concluídas ou dispensadas. Os próximos passos possíveis: preencher os dados reais de
+estoque mínimo (destrava a tela de Pedidos de verdade), corrigir a etiqueta de
+fornecedor incorreta, e revisar os débitos técnicos catalogados (ver
+`PROJECT_CONTEXT.md`). Prioridade a definir com Nicolas.

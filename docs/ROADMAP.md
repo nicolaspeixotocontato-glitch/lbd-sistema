@@ -3,7 +3,7 @@
 > Plano de fases do projeto, em ordem. Este é o documento oficial e resumido —
 > deve ser atualizado a cada fase concluída ou reaberta, com base em validação
 > técnica em produção, não em confirmação verbal.
-> Última atualização: 13/07/2026.
+> Última atualização: 18/07/2026.
 
 ## Como ler este documento
 
@@ -89,6 +89,23 @@ futura, sem ser corrigido nesta sprint.
 Fluxos específicos por nota fiscal para os fornecedores de caixas (Duplex) e chocolate
 (Divine), e controle compartilhado de estoque de mussarela entre lojas (Câmara Fria).
 Dispensados a pedido de Nicolas — são abas da planilha original pouco usadas na prática.
+
+## Fora da numeração de fases — Importação de estoque em lote via CSV
+**Status: concluída**
+
+Não estava no plano original de 5 fases — surgiu da necessidade real de atualizar a
+quantidade de estoque de 150+ itens × 2-3 lojas a partir do fechamento de inventário
+mensal que Nicolas já faz fora do sistema (planilha própria), tarefa que se repete
+todo mês e era inviável item por item pela tela de Estoque.
+
+Botão "Importar CSV" em `estoque.html` (visível só para `editar_estoque`): sobe um CSV
+`nome,loja,quantidade_atual`, casa cada linha por nome (`normalizarBusca()`, ignora
+acento/caixa) com um item ativo do catálogo, e mostra uma pré-visualização obrigatória
+(Encontrado/Não encontrado/Ambíguo/Inválido) antes de qualquer escrita. Só as linhas
+"Encontrado" são aplicadas ao confirmar — atualiza `qty[loja]` e grava `historico` tipo
+`'ajuste'` com `motivo: 'Importação de inventário (CSV)'`. Não mexe em `min`, preço,
+categoria ou fornecedor, não cria itens novos, e não é uma contagem formal (não grava
+em `data.contagens`). Detalhe completo em `CHANGELOG.md`.
 
 ---
 

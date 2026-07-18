@@ -21,8 +21,62 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (Fase 4 — Ajuste manual de pedidos
-primeiro, por ser a mais nova).
+Detalhamento das sprints mais recentes abaixo (Importação de estoque via CSV primeiro,
+por ser a mais nova).
+
+---
+
+## 2026-07-18 — Importação de estoque em lote via CSV (Estoque)
+
+**Objetivo:** dar um jeito de atualizar a quantidade atual de estoque de vários itens
+de uma vez, a partir do inventário mensal que Nicolas já fecha fora do sistema —
+inviável hoje item por item para 150+ itens × 2-3 lojas. Funcionalidade reutilizável
+(vai se repetir todo mês), não um script único.
+
+### Adicionado
+
+- **Botão "Importar CSV"** em `estoque.html`, ao lado do "Exportar CSV" já existente,
+  visível só para quem tem `editar_estoque` (mesma permissão do CRUD de itens —
+  hoje só `admin`).
+- **Formato de entrada**: CSV com cabeçalho `nome,loja,quantidade_atual` (`loja` =
+  `LBD01`/`LBD02`/`LBD03`, quantidade aceita decimais). Parser simples, sem biblioteca
+  externa — formato fixo, sem aspas nem vírgulas dentro dos valores.
+- **Match por nome** usando `normalizarBusca()` (já existente em `assets/app.js`,
+  ignora acento e caixa — mesmo critério da busca das telas) contra os itens
+  **ativos** do catálogo. Cada linha do CSV é classificada:
+  - **Encontrado** — nome bate com exatamente um item ativo.
+  - **Não encontrado** — nenhum item ativo com esse nome.
+  - **Ambíguo** — bate com mais de um item ativo (não importado automaticamente, evita
+    atualizar o item errado).
+  - **Inválido** — loja não reconhecida ou quantidade não numérica/negativa.
+- **Pré-visualização obrigatória antes de aplicar**: tabela com nome da planilha, loja,
+  "atual → novo" (ou o motivo, para as linhas não encontradas/ambíguas/inválidas) e um
+  resumo no topo ("X itens serão atualizados, Y não encontrados, Z ambíguos"). Nada é
+  escrito no estoque até o usuário clicar "Aplicar importação" explicitamente.
+- **Ao confirmar**: só as linhas "Encontrado" são aplicadas — `qty[loja]` do item vai
+  para o novo valor, e uma linha em `historico` tipo `'ajuste'` (mesmo tipo já usado
+  pela Contagem) é gravada com `motivo: 'Importação de inventário (CSV)'` e a diferença
+  aplicada. Histórico só é gravado quando o valor de fato muda (item sem diferença não
+  gera ruído, mesmo critério já usado na Contagem).
+- **Não mexe em `min`, preço, categoria ou fornecedor** — só `qty`. Não é uma
+  "contagem" formal: não passa por `contagem.html`, não grava em `data.contagens`, não
+  exige observação. É uma correção direta de estoque em massa, equivalente a editar
+  vários itens de uma vez pela tela.
+- **Não cria itens novos** a partir do CSV — itens não encontrados ficam de fora, para
+  revisão manual (cadastro continua sendo feito pelo botão "Novo item" já existente).
+
+### Verificação
+
+Testado em servidor local com um CSV de 5 linhas cobrindo os 4 status: um item
+batendo exatamente (Abacaxi 400g), um nome sem acento que bate por
+`normalizarBusca()` mas ficou **ambíguo** de propósito (duplicata de teste criada só
+para essa validação — "Agua com gas" bate com dois itens ativos ao mesmo tempo), um
+nome inexistente ("Produto Fantasma") e duas linhas inválidas (loja não reconhecida,
+quantidade não numérica). Confirmado que nada foi escrito no estoque enquanto a
+pré-visualização estava aberta; confirmado que só a linha "Encontrado" gerou mudança
+de `qty` e uma linha de `historico` (motivo correto, diferença correta); confirmado
+que `min` do item não mudou; confirmado que o botão "Importar CSV" fica oculto para
+um perfil `gerente` (só `editar_estoque`/admin vê).
 
 ---
 

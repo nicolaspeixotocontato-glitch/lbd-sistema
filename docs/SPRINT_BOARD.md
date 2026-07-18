@@ -4,7 +4,7 @@
 > Ao contrário do ROADMAP.md (plano de longo prazo), este documento é descartável:
 > reescreva o conteúdo inteiro a cada novo ciclo de trabalho, sem manter histórico aqui
 > (histórico vive no CHANGELOG.md).
-> Última atualização: 13/07/2026.
+> Última atualização: 18/07/2026.
 
 ## Em andamento agora
 
@@ -12,40 +12,33 @@
 
 ## Concluído recentemente
 
-- [x] Fase 4 — ajuste manual de quantidade em Pedidos (`pedidos.html`, seção "Por
-      fornecedor"): colunas "Sugerido"/"Pedido", indicador visual de ajuste, resumo
-      executivo/seleção/WhatsApp/CSV usando o valor ajustado, estado só em memória —
-      implementada e validada em servidor local. Bug pré-existente encontrado durante
-      a validação (`labelTipoFornecedor` não reconhece fornecedor `tipo: 'direto'`),
-      registrado no `CHANGELOG.md`, não corrigido nesta sprint (fora de escopo).
-- [x] Correções pós-teste da Fase 3 (Contagem): busca sem acentuação
-      (`normalizarBusca()` compartilhada), badge de diferença com largura fixa,
-      rascunho persistente isolado por usuário — validado em servidor local.
-- [x] Fase 3 — tela de Contagem física (semanal/mensal), cálculo automático de
-      consumo/CMV e ajuste de estoque (`contagem.html`, novo tipo de histórico
-      `'ajuste'`, novo array `data.contagens`) — implementada e validada em servidor
-      local (contagem semanal e mensal, diferença positiva e negativa, bloqueio do
-      fechamento mensal sem observação). Fórmula de consumo corrigida durante a
-      validação (dupla contagem de entradas); detalhe em `CHANGELOG.md`.
-- [x] Corrigir Fase 1 de fato (fornecedores reais + LBD02 → Nonoai) — validado em produção.
-- [x] Corrigir categorização de itens enlatados e remover item duplicado — validado.
-- [x] Remover recurso de IA / chave de API exposta em Entradas — validado.
-- [x] Publicar dashboard de acompanhamento ao vivo em `dashboard/index.html`.
-- [x] Micro Sprint Mobile First (`assets/style.css`, `entradas.html`,
-      `saidas.html`) — implementada, validada visualmente em
-      portrait/landscape/tablet/desktop, e **commitada e enviada ao GitHub**
-      (commit `52477e9`, 13/07/2026).
+- [x] Importação de estoque em lote via CSV (`estoque.html`): botão "Importar CSV",
+      match por nome com `normalizarBusca()`, pré-visualização obrigatória
+      (Encontrado/Não encontrado/Ambíguo/Inválido) antes de qualquer escrita, grava
+      `historico` tipo `'ajuste'` só nas linhas confirmadas — implementada e validada
+      em servidor local (CSV de teste cobrindo os 4 status, inclusive um caso ambíguo
+      proposital). Não estava no plano original — registrada fora da numeração de
+      fases no `ROADMAP.md`.
+- [x] Fase 3 (Contagem) e Fase 4 (ajuste manual de Pedidos) implementadas, commitadas
+      e enviadas ao GitHub. Fase 4 validada de ponta a ponta com dados simulados
+      (ajuste de quantidade com decimal, mensagem de WhatsApp com preço/tendência,
+      ajuste sobrevivendo à troca de filtro, reset em reload, bloqueio de valor
+      negativo) — ver `CHANGELOG.md` e `ROADMAP.md` para detalhe completo.
+- [x] Arquivos soltos (`0001-fix-mobile-responsavel.patch`, `teste.pdf`) adicionados
+      ao `.gitignore` — não poluem mais o `git status`, sem precisar apagá-los agora.
+- [x] `CEO_DASHBOARD.md` atualizado (progresso geral: 75%).
 
-## Próximo da fila (ainda não iniciado)
+## Próximo da fila (ainda não iniciado — sem prioridade definida)
 
-- [ ] Formalizar o processo de entrega padrão (prompt → execução → validação técnica
-      em produção com hard refresh → registro no changelog e no roadmap).
+- [ ] Preencher os dados reais de estoque mínimo por item/loja (hoje majoritariamente
+      zerados) — sem isso, a tela de Pedidos não tem o que sugerir na prática. A
+      importação de CSV recém-implementada cobre a quantidade atual, mas não o
+      mínimo — pode valer a pena estender o mesmo fluxo para isso no futuro.
 - [ ] Corrigir `labelTipoFornecedor()` em `pedidos.html` para reconhecer fornecedor
       `tipo: 'direto'` (hoje cai no rótulo errado "Sem fornecedor cadastrado").
+- [ ] Formalizar o processo de entrega padrão (prompt → execução → validação técnica
+      → registro no changelog e no roadmap).
 - [ ] Revisar os débitos técnicos remanescentes listados em `PROJECT_CONTEXT.md`.
-- [ ] Decidir o que fazer com `0001-fix-mobile-responsavel.patch` (arquivo solto,
-      não rastreado pelo Git, na raiz do projeto — aparenta ser resíduo de uma
-      correção já commitada anteriormente).
 
 ## Bloqueios ativos
 

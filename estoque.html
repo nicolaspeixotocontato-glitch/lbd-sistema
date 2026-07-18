@@ -68,7 +68,10 @@
       <div class="card">
         <div class="card-header flex items-center justify-between">
           <span class="card-title">Itens em estoque</span>
-          <button class="btn btn-secondary btn-sm" type="button" id="btn-exportar-csv" onclick="exportarCSV()">Exportar CSV</button>
+          <div class="flex gap-8">
+            <button class="btn btn-secondary btn-sm" type="button" id="btn-importar-csv" onclick="abrirModalImportarCSV()">Importar CSV</button>
+            <button class="btn btn-secondary btn-sm" type="button" id="btn-exportar-csv" onclick="exportarCSV()">Exportar CSV</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="table">
@@ -196,6 +199,49 @@
           <button class="btn btn-primary btn-md" type="submit">Salvar alterações</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Importar CSV -->
+  <div class="modal-backdrop" id="modal-importar-csv" style="display:none">
+    <div class="modal" style="max-width:760px">
+      <div class="modal-header">
+        <span class="modal-title">Importar estoque via CSV</span>
+        <button class="modal-close" type="button" aria-label="Fechar" onclick="fecharModalImportarCSV()" id="close-importar-csv"></button>
+      </div>
+      <div class="modal-body flex flex-col gap-16">
+        <div id="importar-csv-passo-arquivo">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="importar-csv-arquivo">Arquivo CSV</label>
+            <input class="form-input" type="file" id="importar-csv-arquivo" accept=".csv">
+            <div class="form-hint">
+              Colunas esperadas: <code>nome,loja,quantidade_atual</code> (loja = LBD01, LBD02 ou LBD03).
+              Atualiza só a quantidade atual por loja — não mexe em estoque mínimo, preço, categoria ou fornecedor.
+              O match é por nome (ignora acento e maiúsculas/minúsculas); itens não cadastrados no sistema não são criados.
+            </div>
+          </div>
+        </div>
+        <div id="importar-csv-passo-preview" style="display:none">
+          <div class="text-secondary mb-16" id="importar-csv-resumo" style="font-size:var(--fs-13)"></div>
+          <div class="table-wrap" style="max-height:400px; overflow-y:auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Nome (planilha)</th>
+                  <th>Loja</th>
+                  <th>Atual → Novo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="importar-csv-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-md" type="button" onclick="fecharModalImportarCSV()">Cancelar</button>
+        <button class="btn btn-primary btn-md" type="button" id="btn-aplicar-importacao" style="display:none" onclick="aplicarImportacaoCSV()">Aplicar importação</button>
+      </div>
     </div>
   </div>
 
@@ -359,10 +405,12 @@
       document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
       document.getElementById('close-novo-item').innerHTML = ICONS.close;
       document.getElementById('close-editar-item').innerHTML = ICONS.close;
+      document.getElementById('close-importar-csv').innerHTML = ICONS.close;
       document.getElementById('btn-novo-item').innerHTML = `${ICONS.plus} Novo item`;
 
       if (!checkPermissao('editar_estoque')) {
         document.getElementById('btn-novo-item').style.display = 'none';
+        document.getElementById('btn-importar-csv').style.display = 'none';
       }
       if (!checkPermissao('exportar_dados')) {
         document.getElementById('btn-exportar-csv').style.display = 'none';
@@ -553,6 +601,209 @@
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    }
+
+    /* ==========================================================================
+       Importar estoque em lote via CSV
+       ========================================================================== */
+
+    let importacaoCSVLinhas = [];
+
+    function abrirModalImportarCSV() {
+      if (!checkPermissao('editar_estoque')) {
+        toast('Você não tem permissão para importar estoque.', 'error');
+        return;
+      }
+      importacaoCSVLinhas = [];
+      document.getElementById('importar-csv-arquivo').value = '';
+      document.getElementById('importar-csv-passo-arquivo').style.display = '';
+      document.getElementById('importar-csv-passo-preview').style.display = 'none';
+      document.getElementById('btn-aplicar-importacao').style.display = 'none';
+      openModal('modal-importar-csv');
+    }
+
+    function fecharModalImportarCSV() {
+      closeModal('modal-importar-csv');
+    }
+
+    // Parser simples: sem aspas nem vírgulas dentro de valores (formato de entrada fixo).
+    function parseCSVImportacao(texto) {
+      const linhas = texto.split(/\r\n|\n|\r/).map((l) => l.trim()).filter((l) => l.length > 0);
+      if (linhas.length === 0) return { erro: 'Arquivo vazio.' };
+
+      const header = linhas[0].split(',').map((h) => h.trim().toLowerCase());
+      const idxNome = header.indexOf('nome');
+      const idxLoja = header.indexOf('loja');
+      const idxQtd = header.indexOf('quantidade_atual');
+
+      if (idxNome === -1 || idxLoja === -1 || idxQtd === -1) {
+        return { erro: 'Cabeçalho inválido. Esperado: nome,loja,quantidade_atual.' };
+      }
+
+      const registros = [];
+      for (let i = 1; i < linhas.length; i++) {
+        const cols = linhas[i].split(',');
+        registros.push({
+          nomePlanilha: (cols[idxNome] || '').trim(),
+          lojaPlanilha: (cols[idxLoja] || '').trim().toUpperCase(),
+          quantidadeTexto: (cols[idxQtd] || '').trim(),
+        });
+      }
+      return { registros };
+    }
+
+    // Casa cada linha com um item ativo do catálogo (nome normalizado — ignora
+    // acento/caixa, mesmo critério da busca) e classifica: encontrado, não
+    // encontrado, ambíguo (bate com mais de um item) ou inválido (loja/quantidade
+    // não reconhecida). Não escreve nada — só calcula, para a pré-visualização.
+    function processarLinhasImportacao(registros) {
+      const data = getData();
+      const itensAtivos = data.itens.filter((i) => i.ativo);
+
+      return registros.map((r) => {
+        if (!LOJAS.some((l) => l.id === r.lojaPlanilha)) {
+          return { ...r, status: 'invalido', motivoInvalido: `Loja "${r.lojaPlanilha}" não reconhecida.` };
+        }
+
+        const novaQtd = Number(r.quantidadeTexto);
+        if (!r.quantidadeTexto || !Number.isFinite(novaQtd) || novaQtd < 0) {
+          return { ...r, status: 'invalido', motivoInvalido: `Quantidade "${r.quantidadeTexto}" inválida.` };
+        }
+
+        const alvo = normalizarBusca(r.nomePlanilha);
+        const encontrados = itensAtivos.filter((i) => normalizarBusca(i.nome) === alvo);
+
+        if (encontrados.length === 0) {
+          return { ...r, status: 'nao_encontrado' };
+        }
+        if (encontrados.length > 1) {
+          return { ...r, status: 'ambiguo', candidatos: encontrados.map((i) => i.nome) };
+        }
+
+        const item = encontrados[0];
+        return {
+          ...r,
+          status: 'encontrado',
+          itemId: item.id,
+          itemUn: item.un,
+          qtyAtual: item.qty[r.lojaPlanilha] ?? 0,
+          qtyNova: novaQtd,
+        };
+      });
+    }
+
+    function labelStatusImportacao(status) {
+      if (status === 'encontrado') return { label: 'Encontrado', cls: 'badge-ok' };
+      if (status === 'ambiguo') return { label: 'Ambíguo', cls: 'badge-low' };
+      return { label: status === 'invalido' ? 'Inválido' : 'Não encontrado', cls: 'badge-out' };
+    }
+
+    function renderPreviewImportacaoCSV() {
+      const encontrados = importacaoCSVLinhas.filter((l) => l.status === 'encontrado');
+      const naoEncontrados = importacaoCSVLinhas.filter((l) => l.status === 'nao_encontrado');
+      const ambiguos = importacaoCSVLinhas.filter((l) => l.status === 'ambiguo');
+      const invalidos = importacaoCSVLinhas.filter((l) => l.status === 'invalido');
+
+      let resumo = `${encontrados.length} ${encontrados.length === 1 ? 'item será atualizado' : 'itens serão atualizados'}, `
+        + `${naoEncontrados.length} não ${naoEncontrados.length === 1 ? 'encontrado' : 'encontrados'}, `
+        + `${ambiguos.length} ${ambiguos.length === 1 ? 'ambíguo' : 'ambíguos'}`;
+      if (invalidos.length > 0) {
+        resumo += `, ${invalidos.length} ${invalidos.length === 1 ? 'linha inválida' : 'linhas inválidas'}`;
+      }
+      document.getElementById('importar-csv-resumo').textContent = resumo;
+
+      document.getElementById('importar-csv-tbody').innerHTML = importacaoCSVLinhas.map((l) => {
+        const st = labelStatusImportacao(l.status);
+        let mudanca = '—';
+        if (l.status === 'encontrado') {
+          mudanca = `${fmt(l.qtyAtual)} → ${fmt(l.qtyNova)} ${l.itemUn}`;
+        } else if (l.status === 'ambiguo') {
+          mudanca = `Bate com: ${l.candidatos.join(', ')}`;
+        } else if (l.status === 'invalido') {
+          mudanca = l.motivoInvalido;
+        }
+        return `
+          <tr>
+            <td>${l.nomePlanilha}</td>
+            <td class="td-muted">${l.lojaPlanilha}</td>
+            <td class="td-muted">${mudanca}</td>
+            <td><span class="badge ${st.cls}">${st.label}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('importar-csv-passo-arquivo').style.display = 'none';
+      document.getElementById('importar-csv-passo-preview').style.display = '';
+      document.getElementById('btn-aplicar-importacao').style.display = encontrados.length > 0 ? '' : 'none';
+    }
+
+    document.getElementById('importar-csv-arquivo').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const resultado = parseCSVImportacao(reader.result);
+        if (resultado.erro) {
+          toast(resultado.erro, 'error');
+          return;
+        }
+        if (resultado.registros.length === 0) {
+          toast('Nenhuma linha de dados encontrada no arquivo.', 'error');
+          return;
+        }
+        importacaoCSVLinhas = processarLinhasImportacao(resultado.registros);
+        renderPreviewImportacaoCSV();
+      };
+      reader.onerror = () => toast('Não foi possível ler o arquivo.', 'error');
+      reader.readAsText(file, 'UTF-8');
+    });
+
+    // Só aqui algo é de fato escrito — tudo antes disso foi só cálculo para a
+    // pré-visualização. Grava histórico tipo 'ajuste' só quando a quantidade muda de
+    // verdade; não mexe em min, preço, categoria ou fornecedor.
+    function aplicarImportacaoCSV() {
+      if (!checkPermissao('editar_estoque')) return;
+
+      const encontrados = importacaoCSVLinhas.filter((l) => l.status === 'encontrado');
+      if (encontrados.length === 0) {
+        toast('Nenhum item para atualizar.', 'error');
+        return;
+      }
+
+      const usuario = getUsuarioAtivo();
+      const data = getData();
+      const ts = Date.now();
+      let atualizados = 0;
+
+      encontrados.forEach((l) => {
+        const item = data.itens.find((i) => i.id === l.itemId);
+        if (!item) return;
+
+        const anterior = item.qty[l.lojaPlanilha] ?? 0;
+        const diferenca = l.qtyNova - anterior;
+        item.qty[l.lojaPlanilha] = l.qtyNova;
+        atualizados++;
+
+        if (diferenca === 0) return;
+
+        data.historico.unshift({
+          id: gerarIdHistorico(),
+          ts,
+          tipo: 'ajuste',
+          lojaId: l.lojaPlanilha,
+          itemId: item.id,
+          qty: diferenca,
+          motivo: 'Importação de inventário (CSV)',
+          userId: usuario?.id || null,
+          userNome: usuario?.nome || null,
+        });
+      });
+
+      saveData(data);
+      closeModal('modal-importar-csv');
+      toast(`${atualizados} ${atualizados === 1 ? 'item atualizado' : 'itens atualizados'} com sucesso.`, 'success');
+      renderTabela();
     }
 
     initTopbar('estoque');
