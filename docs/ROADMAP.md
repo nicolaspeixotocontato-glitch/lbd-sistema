@@ -76,7 +76,9 @@ WhatsApp e exportação CSV passam a usar o valor de "Pedido". Ajuste é só em 
 (mesmo padrão da seleção de itens e da observação do pedido) — sobrevive à troca de
 filtro, mas reseta num reload completo da página, como pedido. A seção "Por loja" não
 ganhou campo editável (decisão explícita, para não ter dois estados de ajuste do mesmo
-item desincronizados entre si — ver `CHANGELOG.md`). Um bug pré-existente foi
+item desincronizados entre si — ver `CHANGELOG.md`). A mensagem de WhatsApp por
+fornecedor também passou a incluir o último preço pago e o rótulo de tendência
+("Pagando caro"/"Preço médio"/"Preço bom") em cada linha de item. Um bug pré-existente foi
 observado durante a validação (rótulo "Sem fornecedor cadastrado" aparecendo errado
 para fornecedores `tipo: 'direto'`) e registrado no `CHANGELOG.md` para correção
 futura, sem ser corrigido nesta sprint.
