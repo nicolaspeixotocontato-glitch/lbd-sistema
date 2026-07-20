@@ -21,8 +21,46 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (preenchimento obrigatório na Contagem
-primeiro, por ser a mais nova).
+Detalhamento das sprints mais recentes abaixo (detalhes de contagens antigas primeiro,
+por ser a mais nova).
+
+---
+
+## 2026-07-20 — Ver detalhes de uma contagem antiga (Contagem)
+
+**Objetivo:** dar um jeito de conferir os itens de uma contagem já confirmada (ex.: "a
+contagem do dia 10/07"), com o mesmo nível de detalhe que já aparecia na tela logo
+depois de confirmar uma contagem nova — hoje o card "Contagens anteriores desta loja"
+só mostrava um resumo por linha, sem como abrir o detalhe depois.
+
+### Adicionado
+
+- **Botão "Ver detalhes"** em cada linha da tabela "Contagens anteriores desta loja"
+  (nova coluna "Ações").
+- **Modal "Detalhes da contagem"**: cabeçalho com data/horário, loja, tipo e usuário;
+  resumo com total de itens, itens com diferença e valor de consumo total; tabela item
+  a item (nome, estoque anterior, entradas no período, contado, diferença, consumo
+  calculado, valor, observação) — mesmas colunas já usadas na tela pós-confirmação. Por
+  padrão mostra só os itens com diferença, com um botão para alternar e ver todos (útil
+  numa contagem completa com 150+ itens).
+- **`construirResumoContagemHTML()`/`construirTabelaContagemHTML()`** (novo em
+  `contagem.html`): extraídas do antigo `renderResultado()` para serem reaproveitadas
+  tanto no card "Resultado da última contagem" (a contagem recém-confirmada, igual já
+  era) quanto no novo modal (qualquer contagem de `data.contagens`, de qualquer data) —
+  mesmo formato, sem duplicar a lógica da tabela.
+- **Cabeçalho da coluna "Data" renomeado para "Data/Horário"**, já que a célula sempre
+  mostrou os dois juntos (ex.: "18/07 16:40").
+
+### Verificação
+
+Testado em servidor local: registradas duas contagens de teste na mesma loja, com
+`ts` ajustado manualmente para simular datas diferentes (10/07 e 18/07), cada uma com
+itens de diferença distintos. Confirmado que "Ver detalhes" de cada linha abre os
+itens corretos daquela contagem específica (sem misturar com a outra); confirmado o
+alternar "Ver todos os itens" ↔ "Ver só os itens com diferença"; confirmado que
+funciona normalmente **após um reload completo da página** (os dados vêm só de
+`data.contagens`, sem depender de nenhuma variável da sessão atual); cabeçalho
+"Data/Horário" conferido.
 
 ---
 

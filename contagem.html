@@ -173,12 +173,13 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Data</th>
+                <th>Data/Horário</th>
                 <th>Tipo</th>
                 <th>Usuário</th>
                 <th class="td-num">Itens</th>
                 <th class="td-num">Com diferença</th>
                 <th class="td-num">Valor de consumo</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody id="contagens-anteriores-tbody"></tbody>
@@ -186,6 +187,44 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Modal: Detalhes de uma contagem já confirmada (qualquer data, vem de data.contagens) -->
+  <div class="modal-backdrop" id="modal-detalhes-contagem" style="display:none">
+    <div class="modal" style="max-width:920px">
+      <div class="modal-header">
+        <span class="modal-title">Detalhes da contagem</span>
+        <button class="modal-close" type="button" aria-label="Fechar" onclick="closeModal('modal-detalhes-contagem')" id="close-detalhes-contagem"></button>
+      </div>
+      <div class="modal-body flex flex-col gap-16">
+        <div class="tipo-info" id="detalhes-contagem-cabecalho"></div>
+        <div class="resumo-grid" id="detalhes-contagem-resumo"></div>
+        <div class="flex items-center justify-between" style="flex-wrap:wrap; gap:8px;">
+          <span class="text-secondary" id="detalhes-contagem-legenda" style="font-size:var(--fs-12)"></span>
+          <button class="btn btn-ghost btn-sm" type="button" id="btn-alternar-todos-detalhes">Ver todos os itens</button>
+        </div>
+        <div class="table-wrap" style="max-height:480px; overflow-y:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="td-num">Estoque anterior</th>
+                <th class="td-num">Entradas no período</th>
+                <th class="td-num">Contado</th>
+                <th class="td-num">Diferença</th>
+                <th class="td-num">Consumo calculado</th>
+                <th class="td-num">Valor</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody id="detalhes-contagem-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-md" type="button" onclick="closeModal('modal-detalhes-contagem')">Fechar</button>
+      </div>
+    </div>
   </div>
 
   <script src="assets/app.js"></script>
@@ -495,16 +534,13 @@
       renderContagensAnteriores();
     });
 
-    function renderResultado() {
-      const c = resultadoContagem;
-      const card = document.getElementById('resultado-card');
-      if (!c) { card.style.display = 'none'; return; }
-
-      const data = getData();
+    // Compartilhado entre o card "Resultado da última contagem" (logo após confirmar)
+    // e o modal "Detalhes da contagem" (qualquer contagem já registrada, de
+    // data.contagens) — mesmo formato, só muda de onde a contagem vem.
+    function construirResumoContagemHTML(c) {
       const comDiferenca = c.itens.filter((i) => i.diferenca !== 0);
       const valorConsumoTotal = c.itens.reduce((acc, i) => acc + i.valorConsumo, 0);
-
-      document.getElementById('resultado-resumo').innerHTML = `
+      return `
         <div class="resumo-item">
           <span class="resumo-label">Tipo</span>
           <span class="resumo-value">${c.tipo === 'semanal' ? 'Semanal' : 'Mensal'} — ${c.lojaId}</span>
@@ -518,9 +554,14 @@
           <span class="resumo-value">${fmtR(valorConsumoTotal)}</span>
         </div>
       `;
+    }
 
-      const linhas = comDiferenca.length > 0 ? comDiferenca : c.itens;
-      document.getElementById('resultado-tbody').innerHTML = linhas.map((i) => {
+    function construirTabelaContagemHTML(c, mostrarTodos) {
+      const data = getData();
+      const comDiferenca = c.itens.filter((i) => i.diferenca !== 0);
+      const linhas = mostrarTodos || comDiferenca.length === 0 ? c.itens : comDiferenca;
+
+      return linhas.map((i) => {
         const item = data.itens.find((it) => it.id === i.itemId);
         return `
           <tr>
@@ -535,9 +576,68 @@
           </tr>
         `;
       }).join('');
+    }
+
+    function renderResultado() {
+      const c = resultadoContagem;
+      const card = document.getElementById('resultado-card');
+      if (!c) { card.style.display = 'none'; return; }
+
+      document.getElementById('resultado-resumo').innerHTML = construirResumoContagemHTML(c);
+      document.getElementById('resultado-tbody').innerHTML = construirTabelaContagemHTML(c, false);
 
       card.style.display = '';
     }
+
+    /* ==========================================================================
+       Detalhes de uma contagem já confirmada (modal) — funciona pra qualquer
+       contagem em data.contagens, de qualquer data, mesmo após reload da página.
+       ========================================================================== */
+
+    let contagemDetalhesAtual = null;
+    let mostrarTodosDetalhes = false;
+
+    function abrirDetalhesContagem(contagemId) {
+      const data = getData();
+      const c = (data.contagens || []).find((ct) => ct.id === contagemId);
+      if (!c) {
+        toast('Contagem não encontrada.', 'error');
+        return;
+      }
+      contagemDetalhesAtual = c;
+      mostrarTodosDetalhes = false;
+      renderDetalhesContagem();
+      openModal('modal-detalhes-contagem');
+    }
+
+    function renderDetalhesContagem() {
+      const c = contagemDetalhesAtual;
+      if (!c) return;
+
+      const rotuloTipo = c.tipo === 'mensal' ? 'Mensal' : 'Semanal';
+      const hora = new Date(c.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('detalhes-contagem-cabecalho').textContent =
+        `${fmtDateFull(c.ts)} às ${hora} — ${c.lojaId} — ${rotuloTipo} — registrada por ${c.userNome || '—'}`;
+
+      document.getElementById('detalhes-contagem-resumo').innerHTML = construirResumoContagemHTML(c);
+
+      const comDiferenca = c.itens.filter((i) => i.diferenca !== 0);
+      const semToggle = comDiferenca.length === 0 || comDiferenca.length === c.itens.length;
+      const btnToggle = document.getElementById('btn-alternar-todos-detalhes');
+      btnToggle.style.display = semToggle ? 'none' : '';
+      btnToggle.textContent = mostrarTodosDetalhes ? 'Ver só os itens com diferença' : 'Ver todos os itens';
+
+      document.getElementById('detalhes-contagem-legenda').textContent = mostrarTodosDetalhes || comDiferenca.length === 0
+        ? `Mostrando todos os ${c.itens.length} itens.`
+        : `Mostrando só ${comDiferenca.length === 1 ? 'o 1 item com diferença' : `os ${comDiferenca.length} itens com diferença`} (de ${c.itens.length} no total).`;
+
+      document.getElementById('detalhes-contagem-tbody').innerHTML = construirTabelaContagemHTML(c, mostrarTodosDetalhes);
+    }
+
+    document.getElementById('btn-alternar-todos-detalhes').addEventListener('click', () => {
+      mostrarTodosDetalhes = !mostrarTodosDetalhes;
+      renderDetalhesContagem();
+    });
 
     function renderContagensAnteriores() {
       const lojaId = lojaSelecionada();
@@ -550,7 +650,7 @@
       if (contagens.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6">
+            <td colspan="7">
               <div class="empty-state">
                 <span class="empty-state-icon">${ICONS.contagem}</span>
                 <div class="empty-state-title">Nenhuma contagem registrada</div>
@@ -573,6 +673,7 @@
             <td class="td-num">${fmt(c.itens.length)}</td>
             <td class="td-num">${fmt(comDiferenca)}</td>
             <td class="td-num">${fmtR(valorConsumoTotal)}</td>
+            <td><button class="btn btn-ghost btn-sm" type="button" onclick="abrirDetalhesContagem('${c.id}')">Ver detalhes</button></td>
           </tr>
         `;
       }).join('');
@@ -586,6 +687,7 @@
     initTopbar('contagem');
     document.getElementById('search-icon').innerHTML = ICONS.search;
     document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
+    document.getElementById('close-detalhes-contagem').innerHTML = ICONS.close;
     initClearButton('busca-input', 'btn-limpar-busca');
     popularSessao();
     popularCategoriaChips();
