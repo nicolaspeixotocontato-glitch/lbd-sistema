@@ -21,8 +21,54 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (correção do sinal do consumo na
-Contagem primeiro, por ser a mais nova).
+Detalhamento das sprints mais recentes abaixo (preenchimento obrigatório na Contagem
+primeiro, por ser a mais nova).
+
+---
+
+## 2026-07-20 — Preenchimento obrigatório de todos os itens na Contagem
+
+**Objetivo:** eliminar um risco real de dado silenciosamente errado — o campo
+"Quantidade contada" vinha pré-preenchido com o estoque atual do sistema, então um
+item pulado sem querer ficava registrado como "sem diferença" mesmo sem ter sido
+conferido de verdade, sem jeito de saber depois o que realmente foi contado.
+
+### Corrigido
+
+- **Campo "Quantidade contada" começa vazio** para todo item, em qualquer loja ou
+  tipo de contagem (`inicializarItensState()`, `assets/contagem.html` → agora
+  `quantidadeContada: null` em vez do estoque atual). Um "0" digitado explicitamente
+  continua sendo um valor válido, distinto de "não preenchido".
+- **Preenchimento obrigatório antes de confirmar**: o botão "Confirmar contagem" fica
+  desabilitado e, se clicado mesmo assim, bloqueia com uma mensagem clara ("Ainda
+  faltam N itens sem quantidade contada") enquanto houver item sem valor — considerando
+  **todos os itens ativos da loja**, não só os visíveis no filtro de busca/categoria
+  no momento (a pessoa pode trocar de categoria no meio da contagem sem perder o que
+  já preencheu, e sem burlar a validação).
+- **Contador "X de Y preenchidos"** no topo do card "Itens para contagem", atualizado
+  a cada item preenchido, mais um "N sem quantidade contada" no resumo do rodapé.
+- **Itens não contados aparecem destacados** (mesmo estilo visual de linha pendente já
+  usado para observação obrigatória) com o badge "Não contado", em vez de "Sem
+  diferença" — dá pra ver de relance o que ainda falta.
+
+### Não alterado (confirmado explicitamente fora de escopo)
+
+- Cálculo de consumo/diferença (`assets/app.js`) — inalterado.
+- Obrigatoriedade de observação na contagem mensal — continua igual, só passou a
+  considerar apenas itens já preenchidos (um item ainda não contado não é tratado como
+  "diferença sem observação").
+- O rascunho persistente (por usuário, isolado de `lbd_data_v1`) continua funcionando
+  exatamente igual — `null` é serializado e restaurado normalmente pelo `JSON`.
+
+### Verificação
+
+Testado em servidor local: todos os 152 campos vazios ao abrir a tela; preencher um
+item com "0" explícito conta como preenchido (contador some de "151 sem quantidade
+contada" pra "150"); apagar o campo de volta faz o item voltar a "Não contado" e
+reaparecer destacado; trocar o filtro de categoria no meio da contagem não reseta
+valores já digitados de itens que saem da vista; reload da página restaura o rascunho
+com os `null`s e valores preenchidos corretamente; preencher todos os 152 itens libera
+o botão "Confirmar contagem" e a confirmação atualiza o estoque normalmente.
 
 ---
 

@@ -109,6 +109,7 @@
       <div class="card mb-16">
         <div class="card-header flex items-center justify-between" style="flex-wrap:wrap; gap:12px;">
           <span class="card-title">Itens para contagem</span>
+          <span class="text-secondary" id="contador-preenchidos" style="font-size:var(--fs-13)"></span>
         </div>
         <div class="card-body flex flex-col gap-16">
           <div class="filters-row">
@@ -251,15 +252,27 @@
       renderTabelaItens();
     }
 
+    // Começa vazio de propósito (não pré-preenchido com o estoque atual): se quem
+    // conta pular um item, o campo fica em branco, não "sem diferença" — dá pra saber
+    // depois o que realmente foi conferido. Ver contarNaoPreenchidos()/validação no
+    // botão "Confirmar contagem".
     function inicializarItensState(lojaId) {
       const data = getData();
       itensState = {};
       data.itens.filter((i) => i.ativo).forEach((item) => {
         itensState[item.id] = {
-          quantidadeContada: item.qty[lojaId] ?? 0,
+          quantidadeContada: null,
           observacao: '',
         };
       });
+    }
+
+    function itemEstaPreenchido(estado) {
+      return estado && estado.quantidadeContada !== null && estado.quantidadeContada !== undefined;
+    }
+
+    function contarNaoPreenchidos() {
+      return Object.values(itensState).filter((e) => !itemEstaPreenchido(e)).length;
     }
 
     function setTipo(tipo) {
@@ -306,6 +319,7 @@
     }
 
     function badgeDiferenca(diferenca) {
+      if (diferenca === null) return { cls: 'badge-low', label: 'Não contado' };
       if (diferenca === 0) return { cls: 'badge-neutral', label: 'Sem diferença' };
       if (diferenca > 0) return { cls: 'badge-info', label: `+${fmt(diferenca)}` };
       return { cls: 'badge-out', label: fmt(diferenca) };
@@ -333,18 +347,20 @@
       } else {
         tbody.innerHTML = itens.map((item) => {
           const estoqueAtual = item.qty[lojaId] ?? 0;
-          const estado = itensState[item.id] || { quantidadeContada: estoqueAtual, observacao: '' };
-          const diferenca = estado.quantidadeContada - estoqueAtual;
+          const estado = itensState[item.id] || { quantidadeContada: null, observacao: '' };
+          const preenchido = itemEstaPreenchido(estado);
+          const diferenca = preenchido ? estado.quantidadeContada - estoqueAtual : null;
           const badge = badgeDiferenca(diferenca);
-          const precisaObs = showObs && diferenca !== 0;
+          const precisaObs = showObs && preenchido && diferenca !== 0;
+          const pendente = !preenchido || (precisaObs && !(estado.observacao || '').trim());
 
           return `
-            <tr data-item-id="${item.id}" data-estoque-atual="${estoqueAtual}" class="${precisaObs && !(estado.observacao || '').trim() ? 'row-pendente' : ''}">
+            <tr data-item-id="${item.id}" data-estoque-atual="${estoqueAtual}" class="${pendente ? 'row-pendente' : ''}">
               <td>${item.nome}</td>
               <td class="td-muted">${item.cat}</td>
               <td class="td-muted">${item.un}</td>
               <td class="td-num">${fmt(estoqueAtual)}</td>
-              <td><input class="form-input input-contada" type="number" min="0" step="0.01" value="${estado.quantidadeContada}" data-item-id="${item.id}"></td>
+              <td><input class="form-input input-contada" type="number" min="0" step="0.01" placeholder="Digite a qtd. contada" value="${preenchido ? estado.quantidadeContada : ''}" data-item-id="${item.id}"></td>
               <td><span class="badge ${badge.cls} diferenca-badge">${badge.label}</span></td>
               <td style="display:${showObs ? '' : 'none'}">
                 <input class="form-input input-observacao" type="text" placeholder="${precisaObs ? 'Obrigatório: explique a diferença' : 'Opcional'}" value="${estado.observacao || ''}" data-item-id="${item.id}">
@@ -362,17 +378,18 @@
       if (!row) return;
       const estoqueAtual = Number(row.dataset.estoqueAtual) || 0;
       const estado = itensState[itemId];
-      const diferenca = estado.quantidadeContada - estoqueAtual;
+      const preenchido = itemEstaPreenchido(estado);
+      const diferenca = preenchido ? estado.quantidadeContada - estoqueAtual : null;
       const badge = badgeDiferenca(diferenca);
 
       const badgeEl = row.querySelector('.diferenca-badge');
       badgeEl.className = `badge ${badge.cls} diferenca-badge`;
       badgeEl.textContent = badge.label;
 
-      const precisaObs = tipoAtual === 'mensal' && diferenca !== 0;
+      const precisaObs = tipoAtual === 'mensal' && preenchido && diferenca !== 0;
       const obsInput = row.querySelector('.input-observacao');
       if (obsInput) obsInput.placeholder = precisaObs ? 'Obrigatório: explique a diferença' : 'Opcional';
-      row.classList.toggle('row-pendente', precisaObs && !(estado.observacao || '').trim());
+      row.classList.toggle('row-pendente', !preenchido || (precisaObs && !(estado.observacao || '').trim()));
     }
 
     document.getElementById('itens-contagem-tbody').addEventListener('input', (e) => {
@@ -381,7 +398,12 @@
       if (!itemId || !itensState[itemId]) return;
 
       if (el.classList.contains('input-contada')) {
-        itensState[itemId].quantidadeContada = Number(el.value) || 0;
+        if (el.value.trim() === '') {
+          itensState[itemId].quantidadeContada = null;
+        } else {
+          const parsed = Number(el.value);
+          itensState[itemId].quantidadeContada = Number.isFinite(parsed) ? parsed : null;
+        }
       } else if (el.classList.contains('input-observacao')) {
         itensState[itemId].observacao = el.value;
       } else {
@@ -402,11 +424,13 @@
       Object.keys(itensState).forEach((itemId) => {
         const item = data.itens.find((i) => i.id === itemId && i.ativo);
         if (!item) return;
+        const estado = itensState[itemId];
+        if (!itemEstaPreenchido(estado)) return; // ainda não contado — não entra na diferença/observação
         const estoqueAtual = item.qty[lojaId] ?? 0;
-        const diferenca = itensState[itemId].quantidadeContada - estoqueAtual;
+        const diferenca = estado.quantidadeContada - estoqueAtual;
         if (diferenca !== 0) {
           comDiferenca++;
-          if (tipoAtual === 'mensal' && !(itensState[itemId].observacao || '').trim()) pendentesObs++;
+          if (tipoAtual === 'mensal' && !(estado.observacao || '').trim()) pendentesObs++;
         }
       });
 
@@ -416,17 +440,31 @@
     function atualizarResumoFooter() {
       const { comDiferenca, pendentesObs } = contarPendencias();
       const totalItens = Object.keys(itensState).length;
+      const naoPreenchidos = contarNaoPreenchidos();
+      const preenchidos = totalItens - naoPreenchidos;
+
+      document.getElementById('contador-preenchidos').textContent = `${preenchidos} de ${totalItens} preenchidos`;
+
       let texto = `${totalItens} ${totalItens === 1 ? 'item' : 'itens'} · ${comDiferenca} com diferença`;
+      if (naoPreenchidos > 0) {
+        texto += ` · ${naoPreenchidos} ${naoPreenchidos === 1 ? 'sem quantidade contada' : 'sem quantidade contada'}`;
+      }
       if (tipoAtual === 'mensal' && pendentesObs > 0) {
         texto += ` · ${pendentesObs} aguardando observação`;
       }
       document.getElementById('footer-resumo-contagem').textContent = texto;
-      document.getElementById('btn-confirmar-contagem').disabled = tipoAtual === 'mensal' && pendentesObs > 0;
+      document.getElementById('btn-confirmar-contagem').disabled = naoPreenchidos > 0 || (tipoAtual === 'mensal' && pendentesObs > 0);
     }
 
     document.getElementById('btn-confirmar-contagem').addEventListener('click', () => {
       const lojaId = lojaSelecionada();
       const usuario = getUsuarioAtivo();
+
+      const naoPreenchidos = contarNaoPreenchidos();
+      if (naoPreenchidos > 0) {
+        toast(`Ainda faltam ${naoPreenchidos} ${naoPreenchidos === 1 ? 'item sem quantidade contada' : 'itens sem quantidade contada'}.`, 'error');
+        return;
+      }
 
       const { pendentesObs } = contarPendencias();
       if (tipoAtual === 'mensal' && pendentesObs > 0) {
