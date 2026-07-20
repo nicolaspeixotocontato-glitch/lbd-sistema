@@ -368,6 +368,20 @@ function getData() {
   });
   if (sincronizado) saveData(data);
 
+  // Contagens gravadas antes da correção do sinal de consumoCalculado/valorConsumo
+  // (era estoqueAnterior - quantidadeContada; virou quantidadeContada - estoqueAnterior)
+  // ficaram com o sinal invertido. Migração única: inverte os valores já gravados.
+  if (!data.contagemSinalCorrigido) {
+    (data.contagens || []).forEach((c) => {
+      (c.itens || []).forEach((it) => {
+        it.consumoCalculado = -it.consumoCalculado;
+        it.valorConsumo = -it.valorConsumo;
+      });
+    });
+    data.contagemSinalCorrigido = true;
+    saveData(data);
+  }
+
   return data;
 }
 
@@ -628,7 +642,9 @@ function calcularContagem(lojaId, tipo, itensContados) {
     // tempo real as entradas/saídas registradas pelo sistema — somar de novo
     // contaria a mesma entrada duas vezes. entradasNoPeriodo fica só como dado
     // informativo/de contexto para quem revisa a contagem.
-    const consumoCalculado = estoqueAnterior - quantidadeContada;
+    // Sinal: positivo = sobra/achado (contou mais que o esperado), negativo = falta
+    // ("furo de estoque", contou menos que o esperado) — mesmo sinal de `diferenca`.
+    const consumoCalculado = quantidadeContada - estoqueAnterior;
     const ultimoPreco = getUltimoPrecoPago(entrada.itemId);
     const precoUsado = ultimoPreco ? ultimoPreco.precoPago : item.precoUnit;
     const valorConsumo = consumoCalculado * precoUsado;

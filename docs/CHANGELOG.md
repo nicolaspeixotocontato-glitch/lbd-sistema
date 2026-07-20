@@ -21,8 +21,49 @@
 - `dd64833` — Sprint de UX/produtividade: atalhos de teclado, foco e limpeza rapida de filtros
 - `f00d2cf` — docs: adiciona contexto do projeto e changelog, revisa Sprint de UX
 
-Detalhamento das sprints mais recentes abaixo (Importação de estoque via CSV primeiro,
-por ser a mais nova).
+Detalhamento das sprints mais recentes abaixo (correção do sinal do consumo na
+Contagem primeiro, por ser a mais nova).
+
+---
+
+## 2026-07-20 — Correção de sinal em consumoCalculado/valorConsumo (Contagem)
+
+**Objetivo:** corrigir o sinal do consumo calculado pela Contagem para bater com o
+uso real que Nicolas faz do número no dia a dia: sobra (contou mais do que o sistema
+esperava) deve aparecer como valor **positivo**; falta/"furo de estoque" (contou menos
+do que o esperado) deve aparecer como valor **negativo**. A fórmula anterior
+(`estoqueAnterior - quantidadeContada`) fazia exatamente o oposto.
+
+### Corrigido
+
+- **`calcularContagem()`** (`assets/app.js`): `consumoCalculado` passa de
+  `estoqueAnterior - quantidadeContada` para `quantidadeContada - estoqueAnterior` —
+  mesmo sinal de `diferenca` (que já estava correto e não foi alterado). `valorConsumo`
+  continua sendo `consumoCalculado * precoUsado`, só herda o sinal novo.
+- **Migração automática e única em `getData()`**: contagens já gravadas com o sinal
+  antigo (ex.: a primeira contagem semanal da Cristóvão) têm `consumoCalculado` e
+  `valorConsumo` de cada item multiplicados por −1 na primeira vez que o app carrega
+  após esta atualização, controlada por um novo campo `data.contagemSinalCorrigido`
+  (idempotente — não inverte de novo em cargas seguintes).
+
+### Não alterado (confirmado explicitamente fora de escopo)
+
+- `diferenca`, `estoqueAnterior`, `entradasNoPeriodo`, `quantidadeContada` — inalterados.
+- A forma como o estoque real é atualizado (`item.qty[lojaId] = quantidadeContada`) não
+  dependia do sinal de `consumoCalculado`/`valorConsumo` em lugar nenhum do código —
+  essa mudança é 100% de cálculo/exibição, não afeta o estoque em si.
+- Rótulos da tela (`contagem.html`) não foram renomeados nesta rodada.
+
+### Verificação
+
+Testado em servidor local: simulada uma contagem no formato antigo (sinal invertido,
+sem o campo `contagemSinalCorrigido`) com um item de sobra e um de falta — confirmado
+que a migração inverteu `consumoCalculado`/`valorConsumo` de cada item para bater
+exatamente com `diferenca`, e que rodar a migração de novo não inverte uma segunda vez
+(idempotente). Testado também o fluxo novo de ponta a ponta (`registrarContagem`) com
+um item de sobra (consumo/valor positivos) e um de falta (consumo/valor negativos);
+confirmado que `qty[loja]` continua sendo atualizado corretamente pelo valor contado,
+sem relação com o sinal do consumo.
 
 ---
 
