@@ -642,6 +642,8 @@ table {
 
 .table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 65vh;
 }
 
 .table {
@@ -659,6 +661,10 @@ table {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 5;
 }
 
 .table td {

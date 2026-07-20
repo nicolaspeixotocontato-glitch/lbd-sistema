@@ -26,6 +26,50 @@ por ser a mais nova).
 
 ---
 
+## 2026-07-20 — Cabeçalho fixo (sticky) nas tabelas do sistema
+
+**Objetivo:** em tabelas longas (Estoque, Pedidos, Contagem, Histórico etc., todas
+compartilhando a classe `.table` de `assets/style.css`), ao rolar pra baixo numa lista
+de 100+ itens o cabeçalho (nomes das colunas) sumia de vista, deixando confuso qual
+coluna é qual no meio da lista.
+
+### Adicionado
+
+- **`.table th` fixo (`position: sticky; top: 0`)** com fundo sólido
+  (`background: var(--surface)`, mesma cor do `.card`) e `z-index` baixo (acima das
+  linhas, abaixo de modais) — mudança compartilhada em `assets/style.css`, vale pra
+  toda tabela que usa `.table` em qualquer tela, sem precisar mexer em cada página.
+- **`.table-wrap` com scroll interno** (`max-height: 65vh; overflow-y: auto`, mantendo
+  o `overflow-x: auto` já existente para tabelas largas). Necessário porque um sticky
+  "de página" (acompanhando o scroll da topbar) esbarrava em dois contêineres que já
+  existiam — `.card` tinha `overflow: hidden` (cantos arredondados) e `.table-wrap`
+  tinha `overflow-x: auto` (que por regra do CSS força `overflow-y` a virar `auto`
+  também) — e ambos, mesmo sem scroll próprio, definem o contêiner de referência do
+  `position: sticky`, fazendo o cabeçalho simplesmente rolar junto com a página em vez
+  de grudar. Dar à própria `.table-wrap` uma altura máxima com scroll próprio evita
+  mexer em `.card` (e no scroll horizontal já existente) e resolve o sticky de forma
+  confiável entre navegadores — mesmo padrão já usado no modal de detalhes de
+  contagem/histórico, que já tinha `max-height` + `overflow-y: auto` inline.
+
+### Fora do escopo (confirmado)
+
+- Nenhuma lógica ou dado de tela alterado — só comportamento visual de rolagem.
+- Fixar a primeira coluna na rolagem horizontal não foi implementado nesta rodada.
+
+### Verificação
+
+Testado servindo os arquivos estáticos e inspecionando estilo computado + posição real
+dos elementos durante o scroll (não só o CSS, mas o comportamento renderizado) em
+Estoque (152 itens) e Histórico; confirmado que o cabeçalho gruda exatamente no topo do
+`.table-wrap` ao rolar, sem sobrepor a topbar e com fundo 100% opaco (validado trocando
+temporariamente a cor de fundo do cabeçalho para uma cor de alto contraste e
+confirmando que nenhuma linha por trás vaza através dele). Testado em viewport mobile
+(375px): cabeçalho continua grudado e o scroll horizontal da tabela permanece
+funcionando. `.card` e `.table-wrap` de outras telas (Pedidos, Contagem) usam a mesma
+classe compartilhada, sem CSS específico por página.
+
+---
+
 ## 2026-07-20 — Ver detalhes de uma contagem antiga (Contagem)
 
 **Objetivo:** dar um jeito de conferir os itens de uma contagem já confirmada (ex.: "a
