@@ -245,6 +245,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     let filtroLoja = 'todas';
@@ -488,9 +489,10 @@
       openModal('modal-confirmar-exclusao');
     }
 
-    function confirmarExclusaoItem(itemId) {
-      excluirItem(itemId);
+    async function confirmarExclusaoItem(itemId) {
+      const resultado = await excluirItem(itemId);
       closeModal('modal-confirmar-exclusao');
+      if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
       toast('Item excluído com sucesso.', 'success');
       renderTabela();
     }
@@ -511,7 +513,7 @@
       toast('Filtros limpos.', 'success');
     });
 
-    document.getElementById('form-novo-item').addEventListener('submit', (e) => {
+    document.getElementById('form-novo-item').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!checkPermissao('editar_estoque')) return;
       const nome = document.getElementById('novo-nome').value.trim();
@@ -536,13 +538,14 @@
         min[l.id] = Number(document.getElementById(`novo-min-${l.id}`).value) || 0;
       });
 
-      adicionarItem({ nome, cat, un, precoUnit, min, qty: { LBD01: 0, LBD02: 0, LBD03: 0 } });
+      const resultado = await adicionarItem({ nome, cat, un, precoUnit, min, qty: { LBD01: 0, LBD02: 0, LBD03: 0 } });
+      if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
       closeModal('modal-novo-item');
       toast('Item cadastrado com sucesso.', 'success');
       renderTabela();
     });
 
-    document.getElementById('form-editar-item').addEventListener('submit', (e) => {
+    document.getElementById('form-editar-item').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!checkPermissao('editar_estoque') || !itemEditandoId) return;
 
@@ -563,7 +566,8 @@
         qty[l.id] = Number(document.getElementById(`editar-qty-${l.id}`).value) || 0;
       });
 
-      editarItem(itemEditandoId, { nome, cat, un, precoUnit, min, qty });
+      const resultado = await editarItem(itemEditandoId, { nome, cat, un, precoUnit, min, qty });
+      if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
       closeModal('modal-editar-item');
       toast('Item atualizado com sucesso.', 'success');
       renderTabela();
@@ -762,7 +766,9 @@
     // Só aqui algo é de fato escrito — tudo antes disso foi só cálculo para a
     // pré-visualização. Grava histórico tipo 'ajuste' só quando a quantidade muda de
     // verdade; não mexe em min, preço, categoria ou fornecedor.
-    function aplicarImportacaoCSV() {
+    // Sem RPC dedicada para importação em lote (só "set" de valor absoluto vindo de
+    // planilha, não uma decrementação concorrente) — grava direto nas tabelas.
+    async function aplicarImportacaoCSV() {
       if (!checkPermissao('editar_estoque')) return;
 
       const encontrados = importacaoCSVLinhas.filter((l) => l.status === 'encontrado');
@@ -772,46 +778,66 @@
       }
 
       const usuario = getUsuarioAtivo();
-      const data = getData();
       const ts = Date.now();
-      let atualizados = 0;
+      const data = getData();
+      const colunaQty = (lojaId) => 'qty_' + lojaId.toLowerCase();
 
-      encontrados.forEach((l) => {
+      const linhas = encontrados.map((l) => {
         const item = data.itens.find((i) => i.id === l.itemId);
-        if (!item) return;
-
-        const anterior = item.qty[l.lojaPlanilha] ?? 0;
-        const diferenca = l.qtyNova - anterior;
-        item.qty[l.lojaPlanilha] = l.qtyNova;
-        atualizados++;
-
-        if (diferenca === 0) return;
-
-        data.historico.unshift({
-          id: gerarIdHistorico(),
-          ts,
-          tipo: 'ajuste',
-          lojaId: l.lojaPlanilha,
-          itemId: item.id,
-          qty: diferenca,
-          motivo: 'Importação de inventário (CSV)',
-          userId: usuario?.id || null,
-          userNome: usuario?.nome || null,
-        });
+        const anterior = item ? (item.qty[l.lojaPlanilha] ?? 0) : 0;
+        return { ...l, diferenca: l.qtyNova - anterior };
       });
 
-      saveData(data);
+      const resultados = await Promise.all(linhas.map((l) =>
+        supabaseClient.from('itens').update({ [colunaQty(l.lojaPlanilha)]: l.qtyNova }).eq('id', l.itemId).select().single()
+      ));
+
+      const sucesso = [];
+      resultados.forEach((r, idx) => {
+        if (r.error) return;
+        sucesso.push(linhas[idx]);
+        _cacheUpsertItem(itemDbParaJs(r.data));
+      });
+      const comErro = resultados.length - sucesso.length;
+
+      const historicoNovo = sucesso
+        .filter((l) => l.diferenca !== 0)
+        .map((l) => ({
+          id: gerarIdHistorico(), ts, tipo: 'ajuste', loja_id: l.lojaPlanilha, item_id: l.itemId,
+          qty: l.diferenca, motivo: 'Importação de inventário (CSV)',
+          user_id: usuario?.id || null, user_nome: usuario?.nome || null,
+        }));
+
+      if (historicoNovo.length > 0) {
+        const { error: erroHistorico } = await supabaseClient.from('historico').insert(historicoNovo);
+        if (!erroHistorico) {
+          historicoNovo.forEach((h) => atualizarCacheHistorico({ eventType: 'INSERT', new: h }));
+        }
+      }
+
       closeModal('modal-importar-csv');
-      toast(`${atualizados} ${atualizados === 1 ? 'item atualizado' : 'itens atualizados'} com sucesso.`, 'success');
+      const msg = `${sucesso.length} ${sucesso.length === 1 ? 'item atualizado' : 'itens atualizados'}` + (comErro > 0 ? `, ${comErro} com erro de conexão.` : ' com sucesso.');
+      toast(msg, comErro > 0 ? (sucesso.length > 0 ? 'warning' : 'error') : 'success');
       renderTabela();
     }
 
-    initTopbar('estoque');
-    filtroLoja = getFiltroLojaPadrao();
-    popularSelectsCategoria();
-    pintarIconesEstaticos();
-    initClearButton('busca-input', 'btn-limpar-busca');
-    renderAll();
+    window.onDadosAtualizados = () => renderTabela();
+
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('estoque');
+      filtroLoja = getFiltroLojaPadrao();
+      popularSelectsCategoria();
+      pintarIconesEstaticos();
+      initClearButton('busca-input', 'btn-limpar-busca');
+      renderAll();
+    })();
   </script>
 </body>
 </html>

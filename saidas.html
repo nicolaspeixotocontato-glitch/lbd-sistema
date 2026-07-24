@@ -97,6 +97,7 @@
   </div>
 
   <script src="assets/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     let itemSelecionado = null;
@@ -214,13 +215,13 @@
       btn.disabled = !(itemSelecionado && qty > 0 && motivo);
     }
 
-    document.getElementById('btn-confirmar-saida').addEventListener('click', () => {
+    document.getElementById('btn-confirmar-saida').addEventListener('click', async () => {
       const qty = Number(qtyInput.value) || 0;
       const motivo = document.getElementById('motivo-select').value;
       const loja = lojaAtual();
       const usuario = getUsuarioAtivo();
 
-      const resultado = registrarMovimentacao('saida', loja, itemSelecionado.id, qty, motivo, usuario);
+      const resultado = await registrarMovimentacao('saida', loja, itemSelecionado.id, qty, motivo, usuario);
       if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
 
       retiradasSessao.unshift({ ts: Date.now(), item: itemSelecionado.nome, un: itemSelecionado.un, qty, motivo, loja, responsavel: usuario ? usuario.nome : '—' });
@@ -279,12 +280,21 @@
       });
     });
 
-    initTopbar('saidas');
-    document.getElementById('icone-escanear').innerHTML = ICONS.camera;
-    document.getElementById('btn-limpar-busca-item').innerHTML = ICONS.close;
-    initClearButton('busca-item', 'btn-limpar-busca-item');
-    popularSessao();
-    renderRetiradas();
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('saidas');
+      document.getElementById('icone-escanear').innerHTML = ICONS.camera;
+      document.getElementById('btn-limpar-busca-item').innerHTML = ICONS.close;
+      initClearButton('busca-item', 'btn-limpar-busca-item');
+      popularSessao();
+      renderRetiradas();
+    })();
   </script>
 </body>
 </html>

@@ -294,99 +294,169 @@ const HISTORICO_PRECOS = gerarHistoricoPrecos(DADOS_INICIAIS.itens);
    3. Storage
    ========================================================================== */
 
-const STORAGE_KEY_DATA = 'lbd_data_v1';
 const STORAGE_KEY_SESSION = 'lbd_session_v1';
 const STORAGE_KEY_LOJA = 'lbd_loja_ativa_v1';
 
-function getData() {
-  localStorage.removeItem('lbd_api_key');
-  localStorage.removeItem('lbd_api_key_prompted');
+const SUPABASE_URL = 'https://fellzxjoqznqgbdrhssg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WYeP8QC-KkRmnlDdJeqaqQ_oPVHyIh-';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const raw = localStorage.getItem(STORAGE_KEY_DATA);
-  if (!raw) {
-    const inicial = JSON.parse(JSON.stringify(DADOS_INICIAIS));
-    inicial.fornecedores = JSON.parse(JSON.stringify(FORNECEDORES));
-    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(inicial));
-    return inicial;
-  }
+// Cache em memória alimentado pela carga inicial (carregarCacheInicial) e mantido
+// atualizado pelo realtime (inicializarRealtimeSync) — existe para que getData()
+// continue síncrona, sem exigir reescrever todo o resto do app para lidar com Promises.
+let _cache = null; // { itens, historico, contagens, fornecedores }
+let _readyPromise = null;
 
-  const data = JSON.parse(raw);
-  let migrado = false;
-
-  if (!data.fornecedores || data.fornecedores.length === 0) {
-    data.fornecedores = JSON.parse(JSON.stringify(FORNECEDORES));
-    migrado = true;
-  }
-
-  if (!data.contagens) {
-    data.contagens = [];
-    migrado = true;
-  }
-
-  data.itens.forEach((item) => {
-    if (!item.fornecedorId) {
-      const original = DADOS_INICIAIS.itens.find((i) => i.id === item.id);
-      if (original && original.fornecedorId) {
-        item.fornecedorId = original.fornecedorId;
-        migrado = true;
-      }
-    }
-  });
-
-  if (migrado) saveData(data);
-
-  if (!data.catalogoVersion || data.catalogoVersion < 2) {
-    const idsNovoCatalogo = new Set(DADOS_INICIAIS.itens.map((i) => i.id));
-
-    data.itens.forEach((item) => {
-      if (!idsNovoCatalogo.has(item.id)) {
-        item.ativo = false;
-      }
-    });
-
-    const idsExistentes = new Set(data.itens.map((i) => i.id));
-    DADOS_INICIAIS.itens.forEach((item) => {
-      if (!idsExistentes.has(item.id)) {
-        data.itens.push(JSON.parse(JSON.stringify(item)));
-      }
-    });
-
-    data.catalogoVersion = 2;
-    saveData(data);
-  }
-
-  let sincronizado = false;
-  data.itens.forEach((item) => {
-    if ((item.id === 'i001' || item.id === 'i062') && item.cat !== 'Molhos e Conservas') {
-      item.cat = 'Molhos e Conservas';
-      sincronizado = true;
-    }
-    if (item.id === 'i106' && item.ativo !== false) {
-      item.ativo = false;
-      sincronizado = true;
-    }
-  });
-  if (sincronizado) saveData(data);
-
-  // Contagens gravadas antes da correção do sinal de consumoCalculado/valorConsumo
-  // (era estoqueAnterior - quantidadeContada; virou quantidadeContada - estoqueAnterior)
-  // ficaram com o sinal invertido. Migração única: inverte os valores já gravados.
-  if (!data.contagemSinalCorrigido) {
-    (data.contagens || []).forEach((c) => {
-      (c.itens || []).forEach((it) => {
-        it.consumoCalculado = -it.consumoCalculado;
-        it.valorConsumo = -it.valorConsumo;
-      });
-    });
-    data.contagemSinalCorrigido = true;
-    saveData(data);
-  }
-
-  return data;
+function itemDbParaJs(row) {
+  return {
+    id: row.id, nome: row.nome, cat: row.cat, un: row.un,
+    precoUnit: Number(row.preco_unit) || 0,
+    min: { LBD01: Number(row.min_lbd01) || 0, LBD02: Number(row.min_lbd02) || 0, LBD03: Number(row.min_lbd03) || 0 },
+    qty: { LBD01: Number(row.qty_lbd01) || 0, LBD02: Number(row.qty_lbd02) || 0, LBD03: Number(row.qty_lbd03) || 0 },
+    ativo: row.ativo !== false,
+    fornecedorId: row.fornecedor_id || null,
+  };
 }
 
-function saveData(data) {
-  localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(data));
+function historicoDbParaJs(row) {
+  return {
+    id: row.id, ts: row.ts, tipo: row.tipo, lojaId: row.loja_id || undefined,
+    origemId: row.origem_id || undefined, destinoId: row.destino_id || undefined,
+    itemId: row.item_id, qty: Number(row.qty), motivo: row.motivo || null,
+    userId: row.user_id || null, userNome: row.user_nome || null,
+    contagemId: row.contagem_id || undefined,
+  };
+}
+
+function contagemDbParaJs(row) {
+  return {
+    id: row.id, ts: row.ts, lojaId: row.loja_id, tipo: row.tipo,
+    userId: row.user_id || null, userNome: row.user_nome || null, itens: row.itens,
+  };
+}
+
+async function carregarCacheInicial() {
+  const { data: sess } = await supabaseClient.auth.getSession();
+  if (!sess.session) {
+    const { error: authError } = await supabaseClient.auth.signInAnonymously();
+    if (authError) throw new Error('Falha no login anônimo do Supabase: ' + authError.message);
+  }
+
+  const [itensRes, historicoRes, contagensRes, fornecedoresRes] = await Promise.all([
+    supabaseClient.from('itens').select('*'),
+    supabaseClient.from('historico').select('*').order('ts', { ascending: false }),
+    supabaseClient.from('contagens').select('*').order('ts', { ascending: false }),
+    supabaseClient.from('fornecedores').select('*'),
+  ]);
+
+  // Falhar visivelmente aqui é essencial: sem isso, um erro de rede vira uma
+  // tela "vazia" (0 itens) sem explicação, em vez de um aviso claro de conexão.
+  const erro = itensRes.error || historicoRes.error || contagensRes.error || fornecedoresRes.error;
+  if (erro) throw new Error('Falha ao carregar dados do banco: ' + erro.message);
+
+  _cache = {
+    itens: (itensRes.data || []).map(itemDbParaJs),
+    historico: (historicoRes.data || []).map(historicoDbParaJs),
+    contagens: (contagensRes.data || []).map(contagemDbParaJs),
+    fornecedores: (fornecedoresRes.data || []).map((f) => ({ id: f.id, nome: f.nome, tipo: f.tipo })),
+  };
+}
+
+function _cacheUpsertItem(itemJs) {
+  if (!_cache) return;
+  const idx = _cache.itens.findIndex((i) => i.id === itemJs.id);
+  if (idx >= 0) _cache.itens[idx] = itemJs;
+  else _cache.itens.push(itemJs);
+}
+
+function _cacheRemoveItem(id) {
+  if (!_cache) return;
+  _cache.itens = _cache.itens.filter((i) => i.id !== id);
+}
+
+function atualizarCacheItem(payload) {
+  if (payload.eventType === 'DELETE') {
+    _cacheRemoveItem(payload.old.id);
+    return;
+  }
+  _cacheUpsertItem(itemDbParaJs(payload.new));
+}
+
+function atualizarCacheHistorico(payload) {
+  if (!_cache) return;
+  if (payload.eventType === 'DELETE') {
+    _cache.historico = _cache.historico.filter((h) => h.id !== payload.old.id);
+    return;
+  }
+  const novo = historicoDbParaJs(payload.new);
+  if (!_cache.historico.some((h) => h.id === novo.id)) {
+    _cache.historico.unshift(novo); // mantém mais recentes primeiro
+  }
+}
+
+function atualizarCacheContagem(payload) {
+  if (!_cache) return;
+  if (payload.eventType === 'DELETE') {
+    _cache.contagens = _cache.contagens.filter((c) => c.id !== payload.old.id);
+    return;
+  }
+  const novo = contagemDbParaJs(payload.new);
+  if (!_cache.contagens.some((c) => c.id === novo.id)) {
+    _cache.contagens.unshift(novo);
+  }
+}
+
+function inicializarRealtimeSync() {
+  supabaseClient
+    .channel('lbd-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'itens' }, (payload) => {
+      atualizarCacheItem(payload);
+      window.onDadosAtualizados?.();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'historico' }, (payload) => {
+      atualizarCacheHistorico(payload);
+      window.onDadosAtualizados?.();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'contagens' }, (payload) => {
+      atualizarCacheContagem(payload);
+      window.onDadosAtualizados?.();
+    })
+    .subscribe();
+}
+
+// Chamar isso no topo de cada página (dentro de um try/catch — ver mostrarErroConexaoLBD),
+// antes de qualquer getData()/renderização.
+async function initLBD() {
+  if (!_readyPromise) {
+    _readyPromise = carregarCacheInicial()
+      .then(() => inicializarRealtimeSync())
+      .catch((erro) => {
+        _readyPromise = null; // permite tentar de novo (ex.: usuário recarrega a página)
+        throw erro;
+      });
+  }
+  await _readyPromise;
+}
+
+// Estado de erro visível para falha na carga inicial (ex.: sem internet) — evita que a
+// página fique com tela em branco/quebrada sem explicação nenhuma pro usuário.
+function mostrarErroConexaoLBD(erro) {
+  console.error('Erro ao inicializar LBD:', erro);
+  document.body.innerHTML = `
+    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; text-align:center; background:#0D0D0D; color:#F2F2F2; font-family:'Inter', sans-serif;">
+      <div>
+        <p style="margin-bottom:16px; font-size:16px;">Não foi possível conectar ao banco de dados.</p>
+        <p style="margin-bottom:20px; color:#A0A0A0; font-size:13px;">Verifique sua internet e tente novamente.</p>
+        <button onclick="location.reload()" style="padding:10px 20px; border-radius:8px; background:#4DB8A0; color:#0A0A0A; border:none; font-weight:600; cursor:pointer; font-size:14px;">Recarregar página</button>
+      </div>
+    </div>`;
+}
+
+function getData() {
+  if (!_cache) {
+    throw new Error('getData() chamado antes de initLBD() terminar — confira se a pagina esta usando "await initLBD()" no topo.');
+  }
+  return _cache;
 }
 
 function getSession() {
@@ -545,70 +615,29 @@ function gerarIdHistorico() {
   return 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-function registrarMovimentacao(tipo, lojaId, itemId, qty, motivo, user) {
-  const data = getData();
-  const item = data.itens.find((i) => i.id === itemId);
-  if (!item) return { ok: false, erro: 'Item não encontrado.' };
-
-  const atual = item.qty[lojaId] ?? 0;
-  if (tipo === 'saida' && qty > atual) {
-    return { ok: false, erro: 'Quantidade insuficiente em estoque.' };
-  }
-
-  item.qty[lojaId] = tipo === 'entrada' ? atual + qty : atual - qty;
-
-  data.historico.unshift({
-    id: gerarIdHistorico(),
-    ts: Date.now(),
-    tipo,
-    lojaId,
-    itemId,
-    qty,
-    motivo: motivo || null,
-    userId: user?.id || null,
-    userNome: user?.nome || null,
+async function registrarMovimentacao(tipo, lojaId, itemId, qty, motivo, user) {
+  const { data, error } = await supabaseClient.rpc('registrar_movimentacao', {
+    p_tipo: tipo, p_loja_id: lojaId, p_item_id: itemId, p_qty: qty,
+    p_motivo: motivo || null, p_user_id: user?.id || null, p_user_nome: user?.nome || null,
   });
-
-  saveData(data);
-  return { ok: true };
+  if (error) return { ok: false, erro: 'Erro de conexão com o banco de dados.' };
+  return data; // já vem no formato {ok, erro?}
 }
 
-function registrarTransferencia(origemId, destinoId, itemId, qty, user) {
+async function registrarTransferencia(origemId, destinoId, itemId, qty, user) {
   if (origemId === destinoId) return { ok: false, erro: 'Loja de origem e destino devem ser diferentes.' };
 
-  const data = getData();
-  const item = data.itens.find((i) => i.id === itemId);
-  if (!item) return { ok: false, erro: 'Item não encontrado.' };
-
-  const atual = item.qty[origemId] ?? 0;
-  if (qty > atual) return { ok: false, erro: 'Quantidade insuficiente na loja de origem.' };
-
-  item.qty[origemId] = atual - qty;
-  item.qty[destinoId] = (item.qty[destinoId] ?? 0) + qty;
-
-  data.historico.unshift({
-    id: gerarIdHistorico(),
-    ts: Date.now(),
-    tipo: 'transferencia',
-    origemId,
-    destinoId,
-    itemId,
-    qty,
-    userId: user?.id || null,
-    userNome: user?.nome || null,
+  const { data, error } = await supabaseClient.rpc('registrar_transferencia', {
+    p_origem_id: origemId, p_destino_id: destinoId, p_item_id: itemId, p_qty: qty,
+    p_user_id: user?.id || null, p_user_nome: user?.nome || null,
   });
-
-  saveData(data);
-  return { ok: true };
+  if (error) return { ok: false, erro: 'Erro de conexão com o banco de dados.' };
+  return data;
 }
 
 /* ==========================================================================
    5b. Contagem física de estoque (CMV real)
    ========================================================================== */
-
-function gerarIdContagem() {
-  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
 
 function getUltimaContagem(lojaId, tipo) {
   const data = getData();
@@ -666,102 +695,72 @@ function calcularContagem(lojaId, tipo, itensContados) {
 // Grava a contagem: ajusta qty[loja] de cada item para o valor contado, registra um
 // historico tipo 'ajuste' por item, e um registro em data.contagens. Tudo ou nada —
 // se a contagem mensal tiver item com diferença sem observação, nada é gravado.
-function registrarContagem(lojaId, tipo, itensContados, user) {
-  const data = getData();
-  const processados = calcularContagem(lojaId, tipo, itensContados);
+async function registrarContagem(lojaId, tipo, itensContados, user) {
+  const processados = calcularContagem(lojaId, tipo, itensContados); // continua local/síncrono, sem mudanças
 
-  if (tipo === 'mensal') {
-    const semObservacao = processados.find((p) => p.diferenca !== 0 && !p.observacao);
-    if (semObservacao) {
-      const item = data.itens.find((i) => i.id === semObservacao.itemId);
-      return { ok: false, erro: `Observação obrigatória para "${item ? item.nome : semObservacao.itemId}" (diferença detectada na contagem mensal).` };
-    }
-  }
-
-  const contagemId = gerarIdContagem();
-  const ts = Date.now();
-
-  processados.forEach((p) => {
-    const item = data.itens.find((i) => i.id === p.itemId);
-    if (!item) return;
-    item.qty[lojaId] = p.quantidadeContada;
-
-    // Só registra no histórico quando a contagem de fato mudou algo — item sem
-    // diferença não é uma movimentação, é só a confirmação de que bateu.
-    if (p.diferenca === 0) return;
-
-    data.historico.unshift({
-      id: gerarIdHistorico(),
-      ts,
-      tipo: 'ajuste',
-      lojaId,
-      itemId: p.itemId,
-      qty: p.diferenca,
-      motivo: 'contagem',
-      userId: user?.id || null,
-      userNome: user?.nome || null,
-      contagemId,
-    });
+  const { data, error } = await supabaseClient.rpc('registrar_contagem', {
+    p_loja_id: lojaId, p_tipo: tipo, p_itens: processados,
+    p_user_id: user?.id || null, p_user_nome: user?.nome || null,
   });
+  if (error) return { ok: false, erro: 'Erro de conexão com o banco de dados.' };
+  if (!data.ok) return data;
 
-  const contagem = {
-    id: contagemId,
-    ts,
-    lojaId,
-    tipo,
-    userId: user?.id || null,
-    userNome: user?.nome || null,
-    itens: processados,
+  return {
+    ok: true,
+    contagem: {
+      id: data.contagemId, ts: Date.now(), lojaId, tipo,
+      userId: user?.id || null, userNome: user?.nome || null, itens: processados,
+    },
   };
-
-  if (!data.contagens) data.contagens = [];
-  data.contagens.unshift(contagem);
-
-  saveData(data);
-  return { ok: true, contagem };
 }
 
-function adicionarItem(itemData) {
-  const data = getData();
+async function adicionarItem(itemData) {
   const id = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  const item = {
-    id,
-    nome: itemData.nome,
-    cat: itemData.cat,
-    un: itemData.un,
-    precoUnit: Number(itemData.precoUnit) || 0,
-    min: {
-      LBD01: Number(itemData.min?.LBD01) || 0,
-      LBD02: Number(itemData.min?.LBD02) || 0,
-      LBD03: Number(itemData.min?.LBD03) || 0,
-    },
-    qty: {
-      LBD01: Number(itemData.qty?.LBD01) || 0,
-      LBD02: Number(itemData.qty?.LBD02) || 0,
-      LBD03: Number(itemData.qty?.LBD03) || 0,
-    },
+  const row = {
+    id, nome: itemData.nome, cat: itemData.cat, un: itemData.un,
+    preco_unit: Number(itemData.precoUnit) || 0,
+    min_lbd01: Number(itemData.min?.LBD01) || 0, min_lbd02: Number(itemData.min?.LBD02) || 0, min_lbd03: Number(itemData.min?.LBD03) || 0,
+    qty_lbd01: Number(itemData.qty?.LBD01) || 0, qty_lbd02: Number(itemData.qty?.LBD02) || 0, qty_lbd03: Number(itemData.qty?.LBD03) || 0,
     ativo: itemData.ativo !== undefined ? !!itemData.ativo : true,
+    fornecedor_id: itemData.fornecedorId || null,
   };
-  data.itens.push(item);
-  saveData(data);
-  return item;
-}
-
-function editarItem(itemId, campos) {
-  const data = getData();
-  const item = data.itens.find((i) => i.id === itemId);
-  if (!item) return { ok: false, erro: 'Item não encontrado.' };
-  Object.assign(item, campos);
-  saveData(data);
+  const { error } = await supabaseClient.from('itens').insert(row);
+  if (error) return { ok: false, erro: 'Erro de conexão com o banco de dados.' };
+  const item = itemDbParaJs(row);
+  _cacheUpsertItem(item); // não espera o roundtrip do realtime para refletir na própria aba
   return { ok: true, item };
 }
 
-function excluirItem(itemId) {
-  const data = getData();
-  const item = data.itens.find((i) => i.id === itemId);
-  if (!item) return { ok: false, erro: 'Item não encontrado.' };
-  item.ativo = false;
-  saveData(data);
+async function editarItem(itemId, campos) {
+  const patch = {};
+  if (campos.nome !== undefined) patch.nome = campos.nome;
+  if (campos.cat !== undefined) patch.cat = campos.cat;
+  if (campos.un !== undefined) patch.un = campos.un;
+  if (campos.precoUnit !== undefined) patch.preco_unit = Number(campos.precoUnit) || 0;
+  if (campos.fornecedorId !== undefined) patch.fornecedor_id = campos.fornecedorId || null;
+  if (campos.ativo !== undefined) patch.ativo = !!campos.ativo;
+  if (campos.min) {
+    if (campos.min.LBD01 !== undefined) patch.min_lbd01 = Number(campos.min.LBD01) || 0;
+    if (campos.min.LBD02 !== undefined) patch.min_lbd02 = Number(campos.min.LBD02) || 0;
+    if (campos.min.LBD03 !== undefined) patch.min_lbd03 = Number(campos.min.LBD03) || 0;
+  }
+  if (campos.qty) {
+    if (campos.qty.LBD01 !== undefined) patch.qty_lbd01 = Number(campos.qty.LBD01) || 0;
+    if (campos.qty.LBD02 !== undefined) patch.qty_lbd02 = Number(campos.qty.LBD02) || 0;
+    if (campos.qty.LBD03 !== undefined) patch.qty_lbd03 = Number(campos.qty.LBD03) || 0;
+  }
+  const { data, error } = await supabaseClient.from('itens').update(patch).eq('id', itemId).select().single();
+  if (error) return { ok: false, erro: 'Item não encontrado ou erro de conexão.' };
+  const item = itemDbParaJs(data);
+  _cacheUpsertItem(item);
+  return { ok: true, item };
+}
+
+async function excluirItem(itemId) {
+  const { data, error } = await supabaseClient.from('itens').update({ ativo: false }).eq('id', itemId).select().single();
+  if (error) return { ok: false, erro: 'Item não encontrado ou erro de conexão.' };
+  const item = itemDbParaJs(data);
+  _cacheUpsertItem(item);
   return { ok: true, item };
 }
 

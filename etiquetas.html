@@ -124,6 +124,7 @@
   <div id="print-etiquetas" class="etiquetas-grid"></div>
 
   <script src="assets/qrcode.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     function renderItensEtiquetas() {
@@ -178,8 +179,17 @@
       window.print();
     });
 
-    initTopbar('etiquetas');
-    renderItensEtiquetas();
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('etiquetas');
+      renderItensEtiquetas();
+    })();
   </script>
 </body>
 </html>

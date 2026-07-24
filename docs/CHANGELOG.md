@@ -26,6 +26,89 @@ por ser a mais nova).
 
 ---
 
+## 2026-07-23 — Migração do armazenamento de dados para Supabase (banco na nuvem)
+
+**Objetivo:** o sistema guardava todos os dados (itens, histórico, contagens,
+fornecedores) só no `localStorage` de cada navegador — cada aparelho tinha sua própria
+cópia isolada, sem nenhuma sincronização entre eles. Isso já tinha causado um problema
+real: uma contagem feita num navegador não apareceu no celular do Nicolas horas depois,
+ao tentar registrar uma saída. Migra o armazenamento desses 4 tipos de dado para um banco
+Postgres real (Supabase), mantendo login/sessão e rascunho de contagem como já eram
+(locais, em `localStorage`).
+
+### Adicionado/Alterado
+
+- **SDK do Supabase** (`@supabase/supabase-js@2`, via CDN) adicionado antes de
+  `assets/app.js` em todas as páginas que já carregavam `assets/app.js` (`index.html`,
+  `painel.html`, `estoque.html`, `entradas.html`, `saidas.html`, `transferencias.html`,
+  `contagem.html`, `historico.html`, `pedidos.html`, `etiquetas.html`).
+- **Nova camada de storage em `assets/app.js`** (seção 3): `getData()` continua síncrona,
+  mas agora lê de um cache em memória (`_cache`) alimentado pela carga inicial
+  (`carregarCacheInicial()`, com login anônimo no Supabase) e mantido atualizado por
+  assinatura *realtime* (`inicializarRealtimeSync()`, canal `postgres_changes` nas 3
+  tabelas mutáveis). `initLBD()` orquestra os dois passos e precisa ser aguardado
+  (`await initLBD()`) antes de qualquer `getData()`/renderização — cada página envolve seu
+  bootstrap existente numa IIFE assíncrona para isso. Falha na carga inicial (ex.: sem
+  internet) mostra uma tela de erro visível (`mostrarErroConexaoLBD`) com botão de
+  recarregar, em vez de deixar a página em branco/quebrada silenciosamente.
+- **Conversão `snake_case` (Postgres) ↔ `camelCase` aninhado (JS)**: `itemDbParaJs`,
+  `historicoDbParaJs`, `contagemDbParaJs` traduzem as colunas do banco (`preco_unit`,
+  `min_lbd01`, `fornecedor_id`...) para o formato que o resto do app já usa
+  (`item.precoUnit`, `item.min.LBD01`, `item.fornecedorId`), e o caminho inverso acontece
+  nas funções de mutação.
+- **As 6 funções de mutação viraram assíncronas** e passaram a gravar no Supabase em vez
+  de `saveData()`/`localStorage`: `registrarMovimentacao` e `registrarTransferencia`
+  chamam as RPCs `registrar_movimentacao`/`registrar_transferencia` (gravação atômica,
+  `UPDATE ... WHERE qty >= X`, segura com vários aparelhos escrevendo ao mesmo tempo);
+  `registrarContagem` chama a RPC `registrar_contagem`; `adicionarItem`/`editarItem`/
+  `excluirItem` (que não concorrem por `qty`) escrevem direto na tabela `itens` via
+  `supabaseClient.from('itens')` e atualizam `_cache` de forma otimista (não esperam o
+  roundtrip do realtime para refletir na própria aba). Todas continuam retornando
+  `{ ok, erro? }`/`{ ok, item/contagem }`, agora dentro de uma Promise — todo lugar que
+  chamava essas 6 funções (`saidas.html`, `entradas.html`, `transferencias.html`,
+  `contagem.html`, `estoque.html`) ganhou `await` e as funções/handlers viraram `async`.
+- **`window.onDadosAtualizados`** definida em Painel, Estoque, Transferências (lista "hoje"),
+  Histórico, Pedidos e Contagem (só a lista "Contagens anteriores", somente leitura) —
+  re-renderiza a tela sozinha quando outro aparelho muda algo. Deliberadamente **não**
+  ligada à grade de contagem em preenchimento nem às listas com checkbox/input ativos em
+  Saídas/Entradas/Etiquetas, para não perder foco/digitação do usuário no meio de uma
+  ação por causa de um evento remoto.
+- **Importação de estoque em lote via CSV** (`estoque.html` → `aplicarImportacaoCSV`): não
+  fazia parte das 6 funções padrão nem tem RPC dedicada (é um "set" de valor absoluto vindo
+  de planilha, não uma decrementação concorrente) — reescrita para gravar direto nas
+  tabelas `itens` (update por linha, uma coluna `qty_lbdXX` por vez) e `historico` (insert
+  em lote), preservando o comportamento original (só grava histórico quando a quantidade
+  muda de verdade).
+
+### Verificado (contra o banco de produção real, não um ambiente de teste)
+
+- Carga inicial: 152 itens ativos (186 no total, incluindo inativos) carregados
+  corretamente do Supabase, batendo com a contagem esperada da migração de dados.
+- `registrarMovimentacao` (entrada e saída), incluindo bloqueio de saída com quantidade
+  maior que o disponível (retorna `{ok:false, erro:"Quantidade insuficiente em estoque."}`
+  sem gravar nada) — confirmado direto nas tabelas via `select` após cada chamada.
+- `registrarTransferencia` entre duas lojas (e volta), `registrarContagem`, `adicionarItem`,
+  `editarItem` e `excluirItem` (soft delete) — todos gravam corretamente e o cache local
+  reflete o resultado sem precisar de reload.
+- Falha de rede/RPC (função inexistente, host inválido) retorna um erro claro
+  (`{ok:false, erro:...}`) rapidamente, sem travar nem perder a ação silenciosamente.
+- **Sincronização em tempo real entre aparelhos: testada e NÃO confirmada funcionando.**
+  Com um segundo cliente Supabase independente (segunda sessão/canal, simulando um segundo
+  aparelho) inscrito e com status `SUBSCRIBED` (sem erro), nenhum evento `postgres_changes`
+  chegou mesmo após escritas confirmadas no banco. RLS e RPCs estão corretas (as escritas
+  em si funcionam); a suspeita é que as tabelas `itens`/`historico`/`contagens` não estejam
+  adicionadas à publicação `supabase_realtime` do Postgres — configuração do lado do banco,
+  separada de RLS/RPCs, que não pode ser aplicada com a chave `anon` usada pelo cliente.
+  **Pendente**: confirmar/ativar em Database → Replication no painel do Supabase (ou
+  `ALTER PUBLICATION supabase_realtime ADD TABLE itens, historico, contagens;` via SQL
+  Editor) antes de considerar a sincronização entre aparelhos como funcionando de verdade
+  em produção — ver seção 7.0 e débito técnico #1 em `docs/PROJECT_CONTEXT.md`.
+- Item de teste (`TESTE MIGRAÇÃO SUPABASE — pode excluir`) criado, movimentado, transferido,
+  contado e excluído (soft delete) durante a validação — fica marcado como inativo no
+  banco; pode ser removido de vez via SQL Editor se desejado.
+
+---
+
 ## 2026-07-20 — Cabeçalho fixo (sticky) nas tabelas do sistema
 
 **Objetivo:** em tabelas longas (Estoque, Pedidos, Contagem, Histórico etc., todas

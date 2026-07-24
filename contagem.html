@@ -227,6 +227,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     let itensState = {};
@@ -495,7 +496,7 @@
       document.getElementById('btn-confirmar-contagem').disabled = naoPreenchidos > 0 || (tipoAtual === 'mensal' && pendentesObs > 0);
     }
 
-    document.getElementById('btn-confirmar-contagem').addEventListener('click', () => {
+    document.getElementById('btn-confirmar-contagem').addEventListener('click', async () => {
       const lojaId = lojaSelecionada();
       const usuario = getUsuarioAtivo();
 
@@ -517,7 +518,7 @@
         observacao: itensState[itemId].observacao,
       }));
 
-      const resultado = registrarContagem(lojaId, tipoAtual, itensContados, usuario);
+      const resultado = await registrarContagem(lojaId, tipoAtual, itensContados, usuario);
       if (!resultado.ok) {
         toast(resultado.erro, 'error');
         return;
@@ -684,33 +685,47 @@
       renderTabelaItens();
     });
 
-    initTopbar('contagem');
-    document.getElementById('search-icon').innerHTML = ICONS.search;
-    document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
-    document.getElementById('close-detalhes-contagem').innerHTML = ICONS.close;
-    initClearButton('busca-input', 'btn-limpar-busca');
-    popularSessao();
-    popularCategoriaChips();
+    // Só atualiza a lista de contagens anteriores (somente leitura) — a grade de
+    // contagem em preenchimento fica intocada, pra não perder foco/digitação do
+    // usuário no meio de uma contagem por causa de uma mudança em outro aparelho.
+    window.onDadosAtualizados = () => renderContagensAnteriores();
 
-    const rascunho = carregarRascunhoContagem();
-    const lojaSelectInicial = document.getElementById('sessao-loja');
-    const rascunhoValido = rascunho && rascunho.itensState
-      && Array.from(lojaSelectInicial.options).some((o) => o.value === rascunho.lojaId);
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
 
-    if (rascunhoValido) {
-      lojaSelectInicial.value = rascunho.lojaId;
-      tipoAtual = rascunho.tipo === 'mensal' ? 'mensal' : 'semanal';
-      document.getElementById('tipo-semanal').classList.toggle('is-active', tipoAtual === 'semanal');
-      document.getElementById('tipo-mensal').classList.toggle('is-active', tipoAtual === 'mensal');
-      itensState = rascunho.itensState;
-      toast('Rascunho anterior restaurado.', 'default');
-    } else {
-      inicializarItensState(lojaSelecionada());
-    }
+      initTopbar('contagem');
+      document.getElementById('search-icon').innerHTML = ICONS.search;
+      document.getElementById('btn-limpar-busca').innerHTML = ICONS.close;
+      document.getElementById('close-detalhes-contagem').innerHTML = ICONS.close;
+      initClearButton('busca-input', 'btn-limpar-busca');
+      popularSessao();
+      popularCategoriaChips();
 
-    renderInfoUltimaContagem();
-    renderTabelaItens();
-    renderContagensAnteriores();
+      const rascunho = carregarRascunhoContagem();
+      const lojaSelectInicial = document.getElementById('sessao-loja');
+      const rascunhoValido = rascunho && rascunho.itensState
+        && Array.from(lojaSelectInicial.options).some((o) => o.value === rascunho.lojaId);
+
+      if (rascunhoValido) {
+        lojaSelectInicial.value = rascunho.lojaId;
+        tipoAtual = rascunho.tipo === 'mensal' ? 'mensal' : 'semanal';
+        document.getElementById('tipo-semanal').classList.toggle('is-active', tipoAtual === 'semanal');
+        document.getElementById('tipo-mensal').classList.toggle('is-active', tipoAtual === 'mensal');
+        itensState = rascunho.itensState;
+        toast('Rascunho anterior restaurado.', 'default');
+      } else {
+        inicializarItensState(lojaSelecionada());
+      }
+
+      renderInfoUltimaContagem();
+      renderTabelaItens();
+      renderContagensAnteriores();
+    })();
   </script>
 </body>
 </html>

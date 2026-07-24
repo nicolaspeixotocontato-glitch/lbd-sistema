@@ -87,6 +87,7 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     let itemSelecionado = null;
@@ -204,10 +205,10 @@
       btn.disabled = mesmaLoja || !itemSelecionado || !(qty > 0) || !responsavel;
     }
 
-    document.getElementById('btn-confirmar').addEventListener('click', () => {
+    document.getElementById('btn-confirmar').addEventListener('click', async () => {
       const usuario = getUsuarioAtivo();
       const qty = Number(qtyInput.value) || 0;
-      const resultado = registrarTransferencia(origemAtual(), destinoAtual(), itemSelecionado.id, qty, usuario);
+      const resultado = await registrarTransferencia(origemAtual(), destinoAtual(), itemSelecionado.id, qty, usuario);
 
       if (!resultado.ok) { toast(resultado.erro, 'error'); return; }
 
@@ -263,11 +264,22 @@
       }).join('');
     }
 
-    initTopbar('transferencias');
-    document.getElementById('btn-limpar-busca-item').innerHTML = ICONS.close;
-    initClearButton('busca-item', 'btn-limpar-busca-item');
-    popularForm();
-    renderTransferenciasHoje();
+    window.onDadosAtualizados = () => renderTransferenciasHoje();
+
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('transferencias');
+      document.getElementById('btn-limpar-busca-item').innerHTML = ICONS.close;
+      initClearButton('busca-item', 'btn-limpar-busca-item');
+      popularForm();
+      renderTransferenciasHoje();
+    })();
   </script>
 </body>
 </html>

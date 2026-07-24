@@ -2,7 +2,7 @@
 
 > Documento de contexto técnico permanente. Deve ser **atualizado a cada mudança relevante**
 > (nova feature, mudança de arquitetura, bug corrigido, débito técnico identificado ou pago).
-> Última atualização: **2026-07-10**.
+> Última atualização: **2026-07-23**.
 
 ---
 
@@ -31,31 +31,42 @@ diferente (ver seção 8 — Regras de negócio).
 
 ## 2. Arquitetura atual
 
-**Resumo em uma frase:** aplicação 100% client-side (HTML/CSS/JS puro, sem build, sem
-backend), com todos os dados persistidos em `localStorage` do navegador, publicada
-estaticamente no GitHub Pages.
+**Resumo em uma frase:** aplicação client-side (HTML/CSS/JS puro, sem build) publicada
+estaticamente no GitHub Pages, com os dados de negócio (itens/histórico/contagens/
+fornecedores) persistidos num banco Postgres real (Supabase), sincronizados em tempo real
+entre dispositivos — `localStorage` continua em uso, mas só para sessão de login local,
+loja ativa e rascunho de contagem em andamento (ver seção 7).
 
 Pontos-chave:
 
-- **Sem servidor/API própria.** Cada página HTML é standalone, carrega `assets/app.js`
-  (núcleo compartilhado) e implementa sua própria lógica inline em um `<script>` no fim do
-  arquivo.
-- **Sem banco de dados real.** Todo o estado (itens, histórico, fornecedores, sessão do
-  usuário, loja ativa) vive no `localStorage` do navegador — ver seção 7.
+- **Sem servidor/API própria escrita por nós.** Cada página HTML é standalone, carrega o
+  SDK do Supabase + `assets/app.js` (núcleo compartilhado) e implementa sua própria lógica
+  inline em um `<script>` no fim do arquivo. O "backend" é o Supabase (Postgres + Auth +
+  Realtime gerenciados), acessado direto do navegador com a chave pública (`anon`).
+- **Banco de dados real (Supabase/Postgres) para itens/histórico/contagens/fornecedores.**
+  `assets/app.js` mantém um cache em memória (`_cache`) alimentado pela carga inicial e
+  mantido atualizado por assinatura *realtime* (`postgres_changes`) — `getData()` continua
+  síncrona, lendo desse cache, sem exigir reescrever o resto do app. Ver seção 7.
 - **Sem processo de build.** Não há `package.json`, bundler, transpilador ou minificador.
   Os arquivos `.html`/`.js`/`.css` são servidos exatamente como estão no repositório.
 - **Deploy = GitHub Pages.** `.github/workflows/deploy.yml` publica a raiz do repositório
   (`publish_dir: ./`) a cada push na branch `main`, usando `peaceiris/actions-gh-pages`.
   Não há passo de lint, teste ou build antes da publicação — o que estiver em `main` vai
   ao ar imediatamente.
-- **Integração externa único ponto de rede:** a tela Entradas chama diretamente a API da
-  Anthropic (`https://api.anthropic.com/v1/messages`) **do navegador do usuário**, usando
-  uma API key que o próprio usuário cola e que fica salva em `localStorage`
-  (`lbd_api_key`). Não existe proxy/backend intermediando essa chamada.
-- **Multiusuário "de mentirinha":** existe modelagem de usuários, perfis e permissões, mas
-  como tudo é `localStorage`, **cada navegador/dispositivo tem seu próprio estado
-  isolado** — não há sincronização real entre lojas/dispositivos/usuários. Ver detalhes
-  em "Débitos técnicos".
+- **Integração externa (Anthropic):** a tela Entradas chama diretamente a API da Anthropic
+  (`https://api.anthropic.com/v1/messages`) **do navegador do usuário**, usando uma API key
+  que o próprio usuário cola e que fica salva em `localStorage` (`lbd_api_key`). Não existe
+  proxy/backend intermediando essa chamada — isso é independente da migração para Supabase.
+- **Login/sessão continuam locais.** `login()`/`getSession()`/`requireAuth()` seguem
+  baseados em `localStorage`, sem relação com a autenticação do Supabase — o login anônimo
+  do Supabase (`signInAnonymously()`, feito em `initLBD()`) é só uma credencial técnica para
+  o banco aceitar as requisições, invisível pro usuário e independente do login do app.
+- **Multiusuário agora sincronizado de verdade.** Como itens/histórico/contagens vivem no
+  Supabase (não mais em `localStorage` isolado por navegador), uma ação num aparelho
+  (ex.: uma saída) aparece nos outros aparelhos conectados em poucos segundos, via Realtime
+  — resolve o débito técnico #1 histórico (seção 12). Requer, porém, que as tabelas
+  `itens`/`historico`/`contagens` estejam adicionadas à publicação `supabase_realtime` no
+  lado do banco — ver nota de risco ao final da seção 7.
 
 ### Diagrama de dependências entre arquivos
 
@@ -65,12 +76,13 @@ painel.html ─────────────┤
 estoque.html ────────────┤
 entradas.html ───────────┼──> assets/app.js (núcleo: dados, auth, permissões, UI helpers)
 saidas.html ─────────────┤       ├──> assets/jsQR.js (leitura de QR pela câmera)
-transferencias.html ─────┤       └──> ICONS (SVGs inline)
-historico.html ──────────┤
+transferencias.html ─────┤       ├──> supabaseClient (dados: itens/histórico/contagens/fornecedores)
+historico.html ──────────┤       └──> ICONS (SVGs inline)
 pedidos.html ────────────┤
 etiquetas.html ──────────┴──> assets/qrcode.js (geração de QR Code, algoritmo próprio)
 
 Todas as páginas ──> assets/style.css (design system)
+Todas as páginas ──> CDN externo: supabase-js (SDK do Supabase, carregado antes de app.js)
 entradas.html ──> CDN externo: xlsx.full.min.js (SheetJS, exportação .xlsx)
 entradas.html ──> API externa: api.anthropic.com (extração de cupom via IA)
 ```
@@ -83,7 +95,7 @@ entradas.html ──> API externa: api.anthropic.com (extração de cupom via IA
 |---|---|
 | Markup/Estilo | HTML5 + CSS3 puro (sem framework, sem Tailwind/Bootstrap) |
 | Lógica | JavaScript vanilla (ES6+), sem framework (sem React/Vue/etc.) |
-| Persistência | `localStorage` do navegador (sem backend, sem banco de dados) |
+| Persistência | Supabase (Postgres + Auth + Realtime) para itens/histórico/contagens/fornecedores; `localStorage` só para sessão de login, loja ativa e rascunho de contagem |
 | Geração de QR Code | Implementação própria do algoritmo ISO/IEC 18004 (`assets/qrcode.js`), 100% offline |
 | Leitura de QR Code | [jsQR](https://github.com/cozmo/jsQR) vendorizado em `assets/jsQR.js` (funciona em qualquer navegador via `<canvas>` + `getUserMedia`) |
 | Exportação de planilhas | [SheetJS (xlsx)](https://sheetjs.com/) via CDN, usado só em `entradas.html` |
@@ -194,9 +206,14 @@ Hist Rows, Alert Rows.
    - Monta sidebar (`buildSidebar`, filtrando `NAV_ITEMS` pela permissão do usuário) e
      topbar (`buildTopbar`, com nome/iniciais do usuário e loja ativa).
 3. **Operações de estoque** (`registrarMovimentacao`, `registrarTransferencia`,
-   `adicionarItem`, `editarItem`, `excluirItem`) sempre: leem `getData()`, mutam o objeto
-   em memória, chamam `saveData(data)` (grava tudo de volta em `localStorage`) e retornam
-   `{ ok, erro? }` — o chamador decide como exibir o resultado (`toast`).
+   `registrarContagem`, `adicionarItem`, `editarItem`, `excluirItem`) são **assíncronas**:
+   chamam uma função RPC no Postgres (as 3 primeiras — atômicas via `UPDATE ... WHERE
+   qty >= X`, seguras com vários aparelhos escrevendo ao mesmo tempo) ou escrevem direto na
+   tabela `itens` via Supabase (as 3 últimas), e retornam uma Promise com
+   `{ ok, erro? }` — o chamador usa `await` e decide como exibir o resultado (`toast`). O
+   cache local (`_cache`) é atualizado tanto pela própria escrita (otimista, para as 3
+   últimas) quanto pelo evento *realtime* que chega de volta do banco (para todas as 6,
+   inclusive nos outros aparelhos conectados).
 4. **Todo evento de estoque vira uma linha em `data.historico`** (entrada, saída ou
    transferência), consultável em `historico.html` e usada por `painel.html` e
    `pedidos.html`.
@@ -223,22 +240,87 @@ Hist Rows, Alert Rows.
 
 ---
 
-## 7. Estrutura dos dados (incluindo LocalStorage)
+## 7. Estrutura dos dados (Supabase + LocalStorage)
+
+Desde 2026-07-23, os dados de negócio (itens, histórico, contagens, fornecedores) vivem
+num projeto Supabase (Postgres) — `https://fellzxjoqznqgbdrhssg.supabase.co` — e
+`localStorage` ficou restrito a estado **local do aparelho**: sessão de login, loja ativa,
+rascunho de contagem em andamento e a API key da Anthropic.
+
+### 7.0 Camada de storage em `app.js` (cache + realtime)
+
+- `initLBD()` — chamado no topo do bootstrap de cada página (`await initLBD(); ...`) —
+  faz login anônimo no Supabase (`signInAnonymously()`, só uma vez por sessão de
+  navegador), busca as 4 tabelas por completo e monta `_cache` (objeto em memória no
+  formato camelCase que o resto do app já espera), e assina um canal *realtime*
+  (`postgres_changes`) nas 3 tabelas mutáveis. Falha na carga inicial (ex.: sem internet)
+  mostra uma tela de erro visível (`mostrarErroConexaoLBD`) em vez de deixar a página em
+  branco.
+- `getData()` continua **síncrona** — devolve `_cache` diretamente. Lança erro se chamada
+  antes de `initLBD()` terminar (só aconteceria por bug de wiring numa página nova).
+- As conversões `itemDbParaJs`/`historicoDbParaJs`/`contagemDbParaJs` traduzem
+  `snake_case` (nomes de coluna do Postgres, ex. `preco_unit`, `min_lbd01`) para o formato
+  `camelCase` aninhado que todo o resto do app já usa (`item.precoUnit`, `item.min.LBD01`)
+  — e o caminho inverso acontece nas 6 funções de mutação, na hora de gravar.
+- Cada evento `postgres_changes` recebido (de qualquer aparelho, inclusive o que originou a
+  mudança) atualiza `_cache` e chama `window.onDadosAtualizados?.()` — cada página define
+  essa função globalmente para re-renderizar sua própria tela quando os dados mudam em
+  outro lugar. **Exceção deliberada:** em Contagem, `onDadosAtualizados` só atualiza a lista
+  "Contagens anteriores" (somente leitura) — a grade de contagem em preenchimento nunca é
+  re-renderizada por um evento remoto, para não perder foco/digitação do usuário no meio de
+  uma contagem.
+- ⚠️ **Risco conhecido / a verificar no lado do banco:** testado em 2026-07-23 com um
+  segundo cliente Supabase independente (segunda sessão anônima, canal próprio) — a
+  assinatura conecta com sucesso (`SUBSCRIBED`, sem erro) mas **nenhum evento chega** mesmo
+  após escritas confirmadas nas tabelas. RLS e as RPCs estão corretas (todas as escritas
+  foram verificadas direto no banco); o mais provável é que `itens`/`historico`/`contagens`
+  não estejam adicionadas à publicação `supabase_realtime` do Postgres — passo separado de
+  RLS/RPCs, normalmente feito em Database → Replication no painel do Supabase, ou via SQL:
+  `ALTER PUBLICATION supabase_realtime ADD TABLE itens, historico, contagens;`. Sem isso, a
+  sincronização entre aparelhos **não funciona de verdade** hoje, mesmo com todo o código
+  cliente correto — precisa ser confirmado/corrigido no painel do Supabase antes de
+  considerar a sincronização em produção como funcionando.
 
 ### 7.1 Chaves de `localStorage` em uso
 
 | Chave | Definida em | Conteúdo |
 |---|---|---|
-| `lbd_data_v1` | `app.js` (`STORAGE_KEY_DATA`) | Objeto principal: `{ itens[], historico[], fornecedores[] }` |
 | `lbd_session_v1` | `app.js` (`STORAGE_KEY_SESSION`) | `{ userId, ts, lojaAtiva }` |
 | `lbd_loja_ativa_v1` | `app.js` (`STORAGE_KEY_LOJA`) | string com o id da loja ativa (fallback) |
+| `lbd_contagem_draft_v1_<userId>` | `app.js` (`getContagemDraftKey`) | rascunho de contagem em andamento (por usuário), nunca sincronizado — só o estoque real, ao confirmar, vai para o Supabase |
 | `lbd_api_key` | `entradas.html` (`API_KEY_STORAGE`) | API key da Anthropic, em texto puro |
 | `lbd_api_key_prompted` | `entradas.html` (`API_KEY_PROMPTED_STORAGE`) | flag para só pedir a API key uma vez |
 
 Não há expiração/TTL em nenhuma dessas chaves — a sessão de login, por exemplo, é válida
 para sempre até `logout()` ser chamado manualmente ou o `localStorage` ser limpo.
 
-### 7.2 Objeto principal (`getData()` → `lbd_data_v1`)
+### 7.1b Tabelas Supabase (Postgres)
+
+```
+itens: id (text, PK), nome, cat, un (text), preco_unit (numeric),
+  min_lbd01/02/03, qty_lbd01/02/03 (numeric), ativo (boolean), fornecedor_id (text, nullable)
+historico: id (text, PK), ts (bigint), tipo (text), loja_id/origem_id/destino_id (text, nullable),
+  item_id (text), qty (numeric), motivo (text, nullable), user_id/user_nome (text, nullable),
+  contagem_id (text, nullable)
+contagens: id (text, PK), ts (bigint), loja_id (text), tipo (text),
+  user_id/user_nome (text, nullable), itens (jsonb)
+fornecedores: id (text, PK), nome (text), tipo (text)
+```
+
+RLS ativado nas 4, com política liberando leitura/escrita para qualquer usuário autenticado
+(incluindo anônimo). 3 funções RPC (`registrar_movimentacao`, `registrar_transferencia`,
+`registrar_contagem`) fazem as gravações que mudam `qty` de forma atômica
+(`UPDATE ... WHERE qty >= X`), evitando o problema de "ler tudo, alterar, regravar tudo"
+que existiria fazendo a mesma coisa direto do cliente com múltiplos aparelhos escrevendo ao
+mesmo tempo. `adicionarItem`/`editarItem`/`excluirItem` (que não mexem em `qty` de forma
+concorrente) escrevem direto na tabela `itens` via `supabaseClient.from('itens')`, sem RPC.
+
+A importação de estoque em lote via CSV (`estoque.html` → `aplicarImportacaoCSV`) é a única
+gravação que não usa nem RPC nem as 6 funções padrão — grava direto nas tabelas `itens`
+(update por linha) e `historico` (insert em lote), porque é um "set" de valor absoluto vindo
+de planilha, não uma decrementação concorrente que precise da guarda atômica das RPCs.
+
+### 7.2 Objeto principal (`getData()` → agora vem do cache Supabase, não mais de `lbd_data_v1`)
 
 ```js
 {
@@ -450,13 +532,14 @@ Consequências importantes (por não estarem na lista de nenhum perfil, exceto a
   - O model id usado (`claude-sonnet-4-6`) precisa ser validado — não corresponde a um
     padrão de nome de modelo atual conhecido (ver Bugs conhecidos).
   - Não há registro nesta base de código de testes reais com cupons/notas variados.
-- **Multiloja/multiusuário "de verdade"**: a modelagem (perfis, permissões, lojas) existe
-  e funciona *dentro de um único navegador*, mas ainda não existe sincronização real de
-  dados entre dispositivos/usuários diferentes — hoje é, na prática, single-device.
+- **Multiloja/multiusuário "de verdade"**: dados migrados para Supabase em 2026-07-23 —
+  itens/histórico/contagens/fornecedores já são compartilhados entre todos os aparelhos
+  (não mais isolados por navegador). O código para sincronização automática em tempo real
+  (realtime) está implementado, mas **não confirmado funcionando** — ver ressalva na seção
+  7.0/débito técnico #1 (suspeita de publicação `supabase_realtime` não configurada).
 
 ## 11. Funcionalidades pendentes
 
-- Backend/API própria + banco de dados compartilhado (pré-requisito para multiusuário real)
 - Autenticação segura (hash de senha, expiração de sessão, recuperação de senha)
 - Tela de administração de usuários (hoje só existem os 4 usuários hardcoded em `app.js`)
 - Tela de administração de fornecedores (hoje só existe o array `FORNECEDORES`, sem CRUD)
@@ -471,9 +554,17 @@ Consequências importantes (por não estarem na lista de nenhum perfil, exceto a
 
 ## 12. Débitos técnicos
 
-1. **"Banco de dados" = `localStorage`**: sem sincronização entre dispositivos, sem
-   backup automático, sem histórico de versões — limpar o cache do navegador apaga tudo.
-   É o débito técnico mais importante para qualquer plano de reestruturação.
+1. ~~**"Banco de dados" = `localStorage`**: sem sincronização entre dispositivos~~ —
+   **resolvido em 2026-07-23**: itens/histórico/contagens/fornecedores migraram para
+   Supabase (Postgres real, com backup gerenciado pelo próprio Supabase). **Ressalva
+   importante:** a sincronização em tempo real entre aparelhos foi implementada no código
+   (cache + assinatura `postgres_changes` + `window.onDadosAtualizados`), mas em teste não
+   chegou nenhum evento realtime a um segundo cliente conectado, mesmo com escritas
+   confirmadas no banco — suspeita forte de que as tabelas não estão na publicação
+   `supabase_realtime` (ver seção 7.0). Até isso ser confirmado/corrigido no painel do
+   Supabase, tratar a sincronização entre aparelhos como **não verificada em produção**,
+   mesmo que os dados em si já estejam centralizados no banco (o que já elimina o cenário
+   "contagem sumiu" original, ainda que sem o "aparece sozinho" instantâneo).
 2. **Autenticação trivial**: senha = nome do usuário; sem hashing; sessão sem expiração.
    Adequado só para uso interno de confiança, não escalável com segurança.
 3. **Dados de referência hardcoded no código-fonte**: `USUARIOS`, `FORNECEDORES`,
@@ -542,16 +633,16 @@ foi identificado e corrigido — ver commit `90fe0fc`.)*
 - **Importação de relatório do Saipos**: nenhuma integração hoje com o Saipos (sistema de
   PDV usado, presumivelmente, para as vendas) — permitiria cruzar vendas reais com baixa
   de estoque/CMV automaticamente.
-- **Migração futura para Supabase**: caminho considerado para resolver o débito técnico
-  #1 (seção 12) — trocar `localStorage` por um backend real (Postgres + Auth + Realtime
-  do Supabase), habilitando múltiplas lojas/usuários sincronizados de verdade.
+- ~~**Migração futura para Supabase**~~ — **feita em 2026-07-23** (ver seção 7 e débito
+  técnico #1). Próximo passo pendente: confirmar/ativar a publicação `supabase_realtime`
+  para `itens`/`historico`/`contagens` no painel do Supabase — sem isso a sincronização
+  entre aparelhos não dispara sozinha.
 
 ### 14.2 Recomendações técnicas de suporte ao roadmap acima
 
-1. **Decidir o momento da migração de arquitetura de dados**: as pendências de produto
-   acima (CMV, importação Saipos, backup) ficam bem mais simples com um backend real —
-   vale avaliar se compensa migrar para Supabase *antes* de construir CMV/Saipos em cima
-   do `localStorage` atual, para não implementar duas vezes.
+1. ~~**Decidir o momento da migração de arquitetura de dados**~~ — decidido e feito: migrou
+   para Supabase em 2026-07-23. As pendências de produto (CMV, importação Saipos, backup)
+   agora podem ser construídas direto em cima do Postgres real, sem precisar migrar de novo.
 2. Se a decisão for migrar para Supabase (ou outro backend): desenhar o schema
    (itens/histórico/fornecedores/usuários), mover as regras de negócio hoje em
    `assets/app.js` (seções 4 a 5) para o servidor/RLS, e implementar autenticação real

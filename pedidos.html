@@ -131,6 +131,7 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     /* ==========================================================================
@@ -789,12 +790,23 @@
       itensSelecionados = new Set(getTodosItensPendentes().map((l) => l.item.id));
     }
 
-    initTopbar('pedidos');
-    if (!checkPermissao('exportar_dados')) {
-      document.getElementById('btn-exportar-csv-pedidos').style.display = 'none';
-    }
-    inicializarSelecaoPadrao();
-    renderTudo();
+    window.onDadosAtualizados = () => renderTudo();
+
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('pedidos');
+      if (!checkPermissao('exportar_dados')) {
+        document.getElementById('btn-exportar-csv-pedidos').style.display = 'none';
+      }
+      inicializarSelecaoPadrao();
+      renderTudo();
+    })();
   </script>
 </body>
 </html>

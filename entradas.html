@@ -223,6 +223,7 @@
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="assets/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     let resultadoExtracao = null;
@@ -478,7 +479,7 @@
       openModal('modal-match');
     }
 
-    document.getElementById('btn-confirmar-match').addEventListener('click', () => {
+    document.getElementById('btn-confirmar-match').addEventListener('click', async () => {
       const usuario = getUsuarioAtivo();
       const loja = sessaoLojaAtual();
       const linhas = document.querySelectorAll('#match-rows .match-row');
@@ -486,15 +487,15 @@
       let algumRegistrado = false;
       let algumErro = false;
 
-      linhas.forEach((linha) => {
+      for (const linha of linhas) {
         const idx = Number(linha.dataset.idx);
         const itemOriginal = resultadoExtracao.itens[idx];
         const itemId = linha.querySelector('.match-select').value;
         const qty = Number(linha.querySelector('.match-qty').value) || 0;
 
-        if (!itemId || qty <= 0) return;
+        if (!itemId || qty <= 0) continue;
 
-        const resultado = registrarMovimentacao('entrada', loja, itemId, qty, null, usuario);
+        const resultado = await registrarMovimentacao('entrada', loja, itemId, qty, null, usuario);
         if (resultado.ok) {
           algumRegistrado = true;
           const itemCadastro = getData().itens.find((i) => i.id === itemId);
@@ -506,7 +507,7 @@
         } else {
           algumErro = true;
         }
-      });
+      }
 
       if (!algumRegistrado) {
         toast('Nenhum item foi registrado no estoque.', 'error');
@@ -621,13 +622,22 @@
       });
     });
 
-    initTopbar('entradas');
-    pintarIconesEstaticos();
-    document.getElementById('icone-escanear-manual').innerHTML = ICONS.camera;
-    popularSessao();
-    popularSelectItemManual();
-    resetManualForm();
-    renderNotasSessao();
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('entradas');
+      pintarIconesEstaticos();
+      document.getElementById('icone-escanear-manual').innerHTML = ICONS.camera;
+      popularSessao();
+      popularSelectItemManual();
+      resetManualForm();
+      renderNotasSessao();
+    })();
   </script>
 </body>
 </html>

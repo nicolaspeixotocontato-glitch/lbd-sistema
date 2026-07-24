@@ -89,6 +89,7 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="assets/app.js"></script>
   <script>
     let filtroLoja = 'todas';
@@ -349,13 +350,24 @@
       renderResumoLojas();
     }
 
-    initTopbar('painel');
-    if (!checkPermissao('ver_outras_lojas')) {
-      const usuario = getUsuarioAtivo();
-      if (usuario) filtroLoja = usuario.loja;
-    }
-    renderAtalhosRapidos();
-    renderAll();
+    window.onDadosAtualizados = () => renderAll();
+
+    (async () => {
+      try {
+        await initLBD();
+      } catch (erro) {
+        mostrarErroConexaoLBD(erro);
+        return;
+      }
+
+      initTopbar('painel');
+      if (!checkPermissao('ver_outras_lojas')) {
+        const usuario = getUsuarioAtivo();
+        if (usuario) filtroLoja = usuario.loja;
+      }
+      renderAtalhosRapidos();
+      renderAll();
+    })();
   </script>
 </body>
 </html>
